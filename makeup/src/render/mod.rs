@@ -89,7 +89,7 @@ pub enum RenderError {
 mod tests {
     use super::MemoryRenderer;
     use crate::components::EchoText;
-    use crate::UI;
+    use crate::{Renderer, UI};
 
     use eyre::Result;
 
@@ -99,7 +99,8 @@ mod tests {
 
         let mut ui = UI::new(&mut root);
         let mut renderer = MemoryRenderer::new(128, 128);
-        ui.render(&mut renderer).await?;
+        let commands = ui.render().await?;
+        renderer.render(commands).await?;
 
         assert_eq!("henol world".to_string(), renderer.read_at_cursor(11)?);
 

@@ -18,7 +18,7 @@ pub enum DrawCommand {
 #[cfg(test)]
 mod tests {
     use crate::render::MemoryRenderer;
-    use crate::{Component, DrawCommand, UI};
+    use crate::{Component, DrawCommand, Renderer, UI};
 
     use async_trait::async_trait;
     use eyre::Result;
@@ -66,16 +66,16 @@ mod tests {
             children: vec![],
         };
 
+        let mut ui = UI::new(&mut root);
+        let commands = ui.render().await?;
         assert_eq!(
             vec![DrawCommand::TextUnderCursor("henol world".to_string(),)].as_slice(),
-            root.render().await?.as_slice(),
+            commands.as_slice(),
         );
 
-        let mut ui = UI::new(&mut root);
         let mut renderer = MemoryRenderer::new(128, 128);
-        ui.render(&mut renderer).await?;
-
-        assert_eq!("henol world", renderer.read_at_cursor(11)?);
+        renderer.render(commands).await?;
+        assert_eq!("henol world".to_string(), renderer.read_at_cursor(11)?);
 
         Ok(())
     }
