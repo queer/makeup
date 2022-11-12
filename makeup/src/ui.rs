@@ -39,10 +39,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync> UI<'a, M> {
         }
 
         let children = component.children_mut();
-        let ordered_child_keys = children
-            .iter()
-            .map(|x| x.key())
-            .collect::<Vec<&'a str>>();
+        let ordered_child_keys = children.iter().map(|x| x.key()).collect::<Vec<&'a str>>();
 
         let results = Self::parallel_render(children).await?;
 

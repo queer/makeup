@@ -14,8 +14,6 @@ pub enum DrawCommand {
     TextAt { x: usize, y: usize, text: String },
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::{Component, DrawCommand, UI};
