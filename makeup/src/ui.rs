@@ -3,7 +3,7 @@ use dashmap::DashMap;
 use eyre::Result;
 use futures_util::{stream::FuturesUnordered, StreamExt};
 
-use crate::{Component, DrawCommand};
+use crate::{Component, DrawCommand, Renderer};
 
 pub struct UI<'a, M: std::fmt::Debug + Send + Sync> {
     root: &'a mut dyn Component<'a, Message = M>,
@@ -22,9 +22,10 @@ impl<'a, M: std::fmt::Debug + Send + Sync> UI<'a, M> {
 
     /// Render the entire UI.
     // TODO: Graceful error handling...
-    pub async fn render(&'a mut self) -> Result<Vec<DrawCommand>> {
+    pub async fn render(&'a mut self, renderer: &'a mut dyn Renderer<'a>) -> Result<()> {
         let (_key, draw_commands) = Self::render_recursive(self.root).await?;
-        Ok(draw_commands)
+        renderer.render(draw_commands).await?;
+        Ok(())
     }
 
     #[async_recursion]

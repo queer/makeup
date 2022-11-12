@@ -2,9 +2,11 @@
 
 pub mod component;
 pub mod components;
+pub mod render;
 pub mod ui;
 
 pub use component::Component;
+pub use render::Renderer;
 pub use ui::UI;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -15,6 +17,7 @@ pub enum DrawCommand {
 
 #[cfg(test)]
 mod tests {
+    use crate::render::MemoryRenderer;
     use crate::{Component, DrawCommand, UI};
 
     use async_trait::async_trait;
@@ -63,12 +66,16 @@ mod tests {
             children: vec![],
         };
 
-        let mut ui = UI::new(&mut root);
-
         assert_eq!(
             vec![DrawCommand::TextUnderCursor("henol world".to_string(),)].as_slice(),
-            ui.render().await?.as_slice(),
+            root.render().await?.as_slice(),
         );
+
+        let mut ui = UI::new(&mut root);
+        let mut renderer = MemoryRenderer::new(128, 128);
+        ui.render(&mut renderer).await?;
+
+        assert_eq!("henol world", renderer.read_at_cursor(11)?);
 
         Ok(())
     }

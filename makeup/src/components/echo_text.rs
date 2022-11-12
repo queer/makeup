@@ -44,19 +44,17 @@ impl<'a> Component<'a> for EchoText<'a> {
 #[cfg(test)]
 mod tests {
     use super::EchoText;
-    use crate::{DrawCommand, UI};
+    use crate::{Component, DrawCommand};
 
     use eyre::Result;
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
-        let mut root = EchoText::new("henol world");
-
-        let mut ui = UI::new(&mut root);
+        let root = EchoText::new("henol world");
 
         assert_eq!(
             vec![DrawCommand::TextUnderCursor("henol world".to_string(),)].as_slice(),
-            ui.render().await?.as_slice(),
+            root.render().await?.as_slice(),
         );
 
         Ok(())
