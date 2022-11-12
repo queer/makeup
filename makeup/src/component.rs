@@ -8,7 +8,7 @@ use crate::DrawCommand;
 #[async_trait]
 pub trait Component<'a>: std::fmt::Debug + Send + Sync {
     /// The type of messages that can be sent to this component.
-    type Message: std::fmt::Debug + Send + Sync;
+    type Message: std::fmt::Debug + Send + Sync + Clone;
 
     /// Render this component.
     async fn render(&self) -> Result<Vec<DrawCommand>>;
@@ -17,12 +17,16 @@ pub trait Component<'a>: std::fmt::Debug + Send + Sync {
     async fn on_message(&mut self, message: Self::Message) -> Result<Option<Self::Message>>;
 
     /// A read-only view of the component's children.
-    fn children(&'a self) -> Vec<&'a dyn Component<'a, Message = Self::Message>>;
+    fn children(&self) -> Vec<&dyn Component<'a, Message = Self::Message>>;
 
     /// A mutable view of the component's children.
     fn children_mut(
         &'a mut self,
-    ) -> Option<&'a mut Vec<&'a mut dyn Component<'a, Message = Self::Message>>>;
+    ) -> Option<&mut Vec<&mut dyn Component<'a, Message = Self::Message>>>;
 
-    fn key(&self) -> &'a str;
+    fn key(&self) -> usize;
+}
+
+pub fn generate_key() -> usize {
+    rand::random::<usize>()
 }

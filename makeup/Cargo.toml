@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 async-recursion = "1.0.0"
 async-trait = "0.1.58"
-dashmap = "5.4.0"
 eyre = "0.6.8"
 futures-util = "0.3.25"
+rand = "0.8.5"
 thiserror = "1.0.37"
 tokio = { version = "1.21.2", features = ["full"] }

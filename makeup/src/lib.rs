@@ -29,6 +29,7 @@ mod tests {
         #[allow(dead_code)]
         state: (),
         children: Vec<&'a mut dyn Component<'a, Message = ()>>,
+        key: usize,
     }
 
     #[async_trait]
@@ -45,18 +46,18 @@ mod tests {
             Ok(Some(()))
         }
 
-        fn children(&'a self) -> Vec<&dyn Component<'a, Message = Self::Message>> {
+        fn children(&self) -> Vec<&dyn Component<'a, Message = Self::Message>> {
             self.children.iter().map(|c| &**c).collect()
         }
 
         fn children_mut(
             &'a mut self,
-        ) -> Option<&'a mut Vec<&'a mut dyn Component<'a, Message = Self::Message>>> {
+        ) -> Option<&mut Vec<&mut dyn Component<'a, Message = Self::Message>>> {
             Some(&mut self.children)
         }
 
-        fn key(&self) -> &'a str {
-            "basic"
+        fn key(&self) -> usize {
+            self.key
         }
     }
 
@@ -65,6 +66,7 @@ mod tests {
         let mut root = BasicComponent {
             state: (),
             children: vec![],
+            key: crate::component::generate_key(),
         };
 
         let mut ui = UI::new(&mut root);
@@ -90,6 +92,7 @@ mod tests {
         let mut root = BasicComponent {
             state: (),
             children: vec![&mut child],
+            key: crate::component::generate_key(),
         };
 
         let mut ui = UI::new(&mut root);

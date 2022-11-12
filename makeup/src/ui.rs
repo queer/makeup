@@ -1,17 +1,18 @@
+use std::collections::HashMap;
+
 use async_recursion::async_recursion;
-use dashmap::DashMap;
 use eyre::Result;
 use futures_util::{stream::FuturesUnordered, StreamExt};
 
 use crate::{Component, DrawCommand};
 
-pub struct UI<'a, M: std::fmt::Debug + Send + Sync> {
+pub struct UI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
     root: &'a mut dyn Component<'a, Message = M>,
     #[doc(hidden)]
     _phantom: std::marker::PhantomData<&'a M>,
 }
 
-impl<'a, M: std::fmt::Debug + Send + Sync> UI<'a, M> {
+impl<'a, M: std::fmt::Debug + Send + Sync + Clone> UI<'a, M> {
     /// Build a new `UI` from the given root component.
     pub fn new(root: &'a mut dyn Component<'a, Message = M>) -> Self {
         Self {
@@ -30,7 +31,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync> UI<'a, M> {
     #[async_recursion]
     async fn render_recursive(
         component: &'a mut dyn Component<'a, Message = M>,
-    ) -> Result<(&'a str, Vec<DrawCommand>)> {
+    ) -> Result<(usize, Vec<DrawCommand>)> {
         let key = component.key();
         let mut draw_commands: Vec<DrawCommand> = Vec::new();
 
@@ -39,12 +40,12 @@ impl<'a, M: std::fmt::Debug + Send + Sync> UI<'a, M> {
         }
 
         if let Some(children) = component.children_mut() {
-            let ordered_child_keys = children.iter().map(|x| x.key()).collect::<Vec<&'a str>>();
+            let ordered_child_keys: Vec<usize> = children.iter().map(|x| x.key()).collect();
 
             let results = Self::parallel_render(children).await?;
 
             for key in ordered_child_keys {
-                if let Some(commands) = results.get(key).take() {
+                if let Some(commands) = results.get(&key).take() {
                     for command in commands.iter() {
                         draw_commands.push(command.clone());
                     }
@@ -57,8 +58,8 @@ impl<'a, M: std::fmt::Debug + Send + Sync> UI<'a, M> {
 
     async fn parallel_render(
         components: &'a mut [&mut dyn Component<'a, Message = M>],
-    ) -> Result<DashMap<&'a str, Vec<DrawCommand>>> {
-        let results = DashMap::new();
+    ) -> Result<HashMap<usize, Vec<DrawCommand>>> {
+        let mut results = HashMap::new();
 
         let mut child_render_futures = FuturesUnordered::new();
         for child in components.iter_mut() {
