@@ -22,7 +22,7 @@ pub trait Component<'a>: std::fmt::Debug + Send + Sync {
     /// A mutable view of the component's children.
     fn children_mut(
         &'a mut self,
-    ) -> &'a mut Vec<&'a mut dyn Component<'a, Message = Self::Message>>;
+    ) -> Option<&'a mut Vec<&'a mut dyn Component<'a, Message = Self::Message>>>;
 
     fn key(&self) -> &'a str;
 }

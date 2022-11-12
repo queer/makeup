@@ -1,6 +1,7 @@
 #![deny(unsafe_code)]
 
 pub mod component;
+pub mod components;
 pub mod ui;
 
 pub use component::Component;
@@ -46,8 +47,8 @@ mod tests {
 
         fn children_mut(
             &'a mut self,
-        ) -> &'a mut Vec<&'a mut dyn Component<'a, Message = Self::Message>> {
-            &mut self.children
+        ) -> Option<&'a mut Vec<&'a mut dyn Component<'a, Message = Self::Message>>> {
+            Some(&mut self.children)
         }
 
         fn key(&self) -> &'a str {

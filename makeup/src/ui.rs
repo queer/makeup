@@ -38,15 +38,16 @@ impl<'a, M: std::fmt::Debug + Send + Sync> UI<'a, M> {
             draw_commands.push(x);
         }
 
-        let children = component.children_mut();
-        let ordered_child_keys = children.iter().map(|x| x.key()).collect::<Vec<&'a str>>();
+        if let Some(children) = component.children_mut() {
+            let ordered_child_keys = children.iter().map(|x| x.key()).collect::<Vec<&'a str>>();
 
-        let results = Self::parallel_render(children).await?;
+            let results = Self::parallel_render(children).await?;
 
-        for key in ordered_child_keys {
-            if let Some(commands) = results.get(key).take() {
-                for command in commands.iter() {
-                    draw_commands.push(command.clone());
+            for key in ordered_child_keys {
+                if let Some(commands) = results.get(key).take() {
+                    for command in commands.iter() {
+                        draw_commands.push(command.clone());
+                    }
                 }
             }
         }
