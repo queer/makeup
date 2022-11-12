@@ -4,22 +4,22 @@ use eyre::Result;
 use crate::{Component, DrawCommand};
 
 #[derive(Debug)]
-pub struct EchoText<'a> {
-    text: &'a str,
+pub struct EchoText {
+    text: String,
 }
 
-impl<'a> EchoText<'a> {
-    pub fn new(text: &'a str) -> Self {
-        Self { text }
+impl EchoText {
+    pub fn new<S: Into<String>>(text: S) -> Self {
+        Self { text: text.into() }
     }
 }
 
 #[async_trait]
-impl<'a> Component<'a> for EchoText<'a> {
+impl<'a> Component<'a> for EchoText {
     type Message = ();
 
     async fn render(&self) -> Result<Vec<DrawCommand>> {
-        Ok(vec![DrawCommand::TextUnderCursor(self.text.to_string())])
+        Ok(vec![DrawCommand::TextUnderCursor(self.text.clone())])
     }
 
     async fn on_message(&mut self, _message: Self::Message) -> Result<Option<Self::Message>> {

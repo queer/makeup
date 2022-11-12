@@ -28,6 +28,7 @@ impl<'a> Renderer<'a> for MemoryRenderer {
                     for (i, c) in text.chars().enumerate() {
                         self.text.insert((self.cursor_x + i, self.cursor_y), c);
                     }
+                    self.cursor_x += text.len();
                 }
                 DrawCommand::TextAt { x, y, text } => {
                     self.bounds_check(x, y)?;
@@ -62,6 +63,13 @@ impl MemoryRenderer {
         } else {
             Err(RenderError::OutOfBounds(x, y).into())
         }
+    }
+
+    pub fn move_cursor(&mut self, x: usize, y: usize) -> Result<()> {
+        self.bounds_check(x, y)?;
+        self.cursor_x = x;
+        self.cursor_y = y;
+        Ok(())
     }
 
     pub fn read_at_cursor(&self, width: usize) -> Result<String> {
@@ -102,6 +110,7 @@ mod tests {
         let commands = ui.render().await?;
         renderer.render(commands).await?;
 
+        renderer.move_cursor(0, 0)?;
         assert_eq!("henol world".to_string(), renderer.read_at_cursor(11)?);
 
         Ok(())

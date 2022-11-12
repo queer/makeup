@@ -17,6 +17,7 @@ pub enum DrawCommand {
 
 #[cfg(test)]
 mod tests {
+    use crate::components::EchoText;
     use crate::render::MemoryRenderer;
     use crate::{Component, DrawCommand, Renderer, UI};
 
@@ -68,14 +69,46 @@ mod tests {
 
         let mut ui = UI::new(&mut root);
         let commands = ui.render().await?;
+        let expected = "henol world".to_string();
         assert_eq!(
-            vec![DrawCommand::TextUnderCursor("henol world".to_string(),)].as_slice(),
+            vec![DrawCommand::TextUnderCursor(expected.clone())].as_slice(),
             commands.as_slice(),
         );
 
         let mut renderer = MemoryRenderer::new(128, 128);
         renderer.render(commands).await?;
-        assert_eq!("henol world".to_string(), renderer.read_at_cursor(11)?);
+        renderer.move_cursor(0, 0)?;
+        assert_eq!(expected, renderer.read_at_cursor(expected.len())?);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_it_renders_children() -> Result<()> {
+        let mut child = EchoText::new("? wrong! banana!");
+
+        let mut root = BasicComponent {
+            state: (),
+            children: vec![&mut child],
+        };
+
+        let mut ui = UI::new(&mut root);
+        let commands = ui.render().await?;
+        assert_eq!(
+            vec![
+                DrawCommand::TextUnderCursor("henol world".to_string()),
+                DrawCommand::TextUnderCursor("? wrong! banana!".to_string())
+            ]
+            .as_slice(),
+            commands.as_slice(),
+        );
+
+        let mut renderer = MemoryRenderer::new(128, 128);
+        renderer.render(commands).await?;
+
+        let expected = "henol world? wrong! banana".to_string();
+        renderer.move_cursor(0, 0)?;
+        assert_eq!(expected, renderer.read_at_cursor(expected.len())?);
 
         Ok(())
     }
