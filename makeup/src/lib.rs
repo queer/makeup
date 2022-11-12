@@ -1,6 +1,4 @@
-#[allow(unused)]
-#[deny(unsafe_code)]
-use async_trait::async_trait;
+#![deny(unsafe_code)]
 
 pub mod component;
 pub mod ui;
@@ -16,7 +14,7 @@ pub enum DrawCommand {
 
 #[cfg(test)]
 mod tests {
-    use super::{Component, DrawCommand, UI};
+    use crate::{Component, DrawCommand, UI};
 
     use async_trait::async_trait;
     use eyre::Result;
