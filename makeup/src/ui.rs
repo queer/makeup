@@ -1,81 +1,155 @@
-use std::collections::HashMap;
+use std::sync::Arc;
 
 use async_recursion::async_recursion;
 use eyre::Result;
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use tokio::sync::Mutex;
 
+use crate::component::Key;
+use crate::post_office::PostOffice;
+use crate::util::RwLocked;
 use crate::{Component, DrawCommand};
 
-pub struct UI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
-    root: &'a mut dyn Component<'a, Message = M>,
-    #[doc(hidden)]
-    _phantom: std::marker::PhantomData<&'a M>,
+#[derive(Debug)]
+pub struct MUI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
+    ui: Mutex<UI<'a, M>>,
 }
 
-impl<'a, M: std::fmt::Debug + Send + Sync + Clone> UI<'a, M> {
-    /// Build a new `UI` from the given root component.
-    pub fn new(root: &'a mut dyn Component<'a, Message = M>) -> Self {
+impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
+    pub fn new(root: &'a mut dyn Component<Message = M>) -> Self {
         Self {
-            root,
-            _phantom: std::marker::PhantomData,
+            ui: Mutex::new(UI::new(root)),
+        }
+    }
+
+    pub async fn render(&'a self) -> Result<Vec<DrawCommand>> {
+        let ui = self.ui.lock().await;
+        ui.render().await
+    }
+
+    pub async fn send(&self, key: Key, message: M) {
+        let ui = self.ui.lock().await;
+        ui.send(key, message).await;
+    }
+}
+
+#[derive(Debug)]
+struct UI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
+    root: RwLocked<&'a mut dyn Component<Message = M>>,
+    post_office: Arc<Mutex<PostOffice<M>>>,
+}
+
+impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'a> UI<'a, M> {
+    /// Build a new `UI` from the given root component.
+    pub fn new(root: &'a mut dyn Component<Message = M>) -> Self {
+        Self {
+            root: RwLocked::new(root),
+            post_office: Arc::new(Mutex::new(PostOffice::new())),
         }
     }
 
     /// Render the entire UI.
     // TODO: Graceful error handling...
-    pub async fn render(&'a mut self) -> Result<Vec<DrawCommand>> {
-        let (_key, draw_commands) = Self::render_recursive(self.root).await?;
+    pub async fn render(&self) -> Result<Vec<DrawCommand>> {
+        Self::update_recursive(&self.root, self.post_office.clone()).await?;
+        let root = &self.root.read().await;
+        let draw_commands = root.render_pass().await?;
         Ok(draw_commands)
     }
 
     #[async_recursion]
-    async fn render_recursive(
-        component: &'a mut dyn Component<'a, Message = M>,
-    ) -> Result<(usize, Vec<DrawCommand>)> {
-        let key = component.key();
-        let mut draw_commands: Vec<DrawCommand> = Vec::new();
+    async fn update_recursive(
+        component: &RwLocked<&mut dyn Component<Message = M>>,
+        post_office: Arc<Mutex<PostOffice<M>>>,
+    ) -> Result<()> {
+        let post_office = post_office.clone();
+        let mut post_office = post_office.lock().await;
+        let mut component = component.write().await;
+        if let Some(messages) = post_office.mailbox(*component) {
+            (*component).update_pass(messages).await?;
+        }
+        Ok(())
+    }
 
-        for x in component.render().await? {
-            draw_commands.push(x);
+    pub async fn send(&self, key: usize, message: M) {
+        let mut post_office = self.post_office.lock().await;
+        post_office.send(key, message);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::component::{Key, Mailbox};
+    use crate::render::MemoryRenderer;
+    use crate::{Component, DrawCommand, Renderer, MUI};
+
+    use async_trait::async_trait;
+    use eyre::Result;
+
+    #[derive(Debug)]
+    struct PingableComponent {
+        #[allow(dead_code)]
+        state: (),
+        key: Key,
+        was_pinged: bool,
+    }
+
+    #[async_trait]
+    impl Component for PingableComponent {
+        type Message = String;
+
+        async fn update(&mut self, mailbox: &Mailbox<Self>) -> Result<()> {
+            if let Some("ping") = mailbox.iter().next().map(|s| s.as_str()) {
+                self.was_pinged = true;
+            }
+
+            Ok(())
         }
 
-        if let Some(children) = component.children_mut() {
-            let ordered_child_keys: Vec<usize> = children.iter().map(|x| x.key()).collect();
-
-            let results = Self::parallel_render(children).await?;
-
-            for key in ordered_child_keys {
-                if let Some(commands) = results.get(&key).take() {
-                    for command in commands.iter() {
-                        draw_commands.push(command.clone());
-                    }
-                }
+        async fn render(&self) -> Result<Vec<DrawCommand>> {
+            if !self.was_pinged {
+                Ok(vec![DrawCommand::TextUnderCursor("ping?".to_string())])
+            } else {
+                Ok(vec![DrawCommand::TextUnderCursor("pong!".to_string())])
             }
         }
 
-        Ok((key, draw_commands))
-    }
-
-    async fn parallel_render(
-        components: &'a mut [&mut dyn Component<'a, Message = M>],
-    ) -> Result<HashMap<usize, Vec<DrawCommand>>> {
-        let mut results = HashMap::new();
-
-        let mut child_render_futures = FuturesUnordered::new();
-        for child in components.iter_mut() {
-            child_render_futures.push(Self::render_recursive(&mut **child));
+        async fn update_pass(&mut self, mailbox: &Mailbox<Self>) -> Result<()> {
+            self.update(mailbox).await
         }
 
-        while let Some(render_result) = child_render_futures.next().await {
-            let (key, draw_commands) = render_result?;
-            results.insert(key, draw_commands);
+        async fn render_pass(&self) -> Result<Vec<DrawCommand>> {
+            self.render().await
         }
 
-        Ok(results)
+        fn key(&self) -> Key {
+            self.key
+        }
     }
 
-    /// A read-only view of the UI component tree.
-    pub fn tree_view(&'a mut self) -> &'a mut dyn Component<'a, Message = M> {
-        self.root
+    #[tokio::test]
+    async fn test_messaging_works() -> Result<()> {
+        let mut root = PingableComponent {
+            state: (),
+            key: crate::component::generate_key(),
+            was_pinged: false,
+        };
+        let key = root.key();
+
+        let ui = MUI::new(&mut root);
+        let mut renderer = MemoryRenderer::new(128, 128);
+        let commands = ui.render().await?;
+        renderer.render(commands).await?;
+
+        renderer.move_cursor(0, 0)?;
+        assert_eq!("ping?".to_string(), renderer.read_at_cursor(5)?);
+
+        ui.send(key, "ping".to_string()).await;
+        let commands = ui.render().await?;
+        renderer.render(commands).await?;
+
+        renderer.move_cursor(0, 0)?;
+        assert_eq!("pong!".to_string(), renderer.read_at_cursor(5)?);
+
+        Ok(())
     }
 }

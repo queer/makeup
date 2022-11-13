@@ -97,7 +97,7 @@ pub enum RenderError {
 mod tests {
     use super::MemoryRenderer;
     use crate::components::EchoText;
-    use crate::{Renderer, UI};
+    use crate::{Renderer, MUI};
 
     use eyre::Result;
 
@@ -105,7 +105,7 @@ mod tests {
     async fn test_it_works() -> Result<()> {
         let mut root = EchoText::new("henol world");
 
-        let mut ui = UI::new(&mut root);
+        let ui = MUI::<()>::new(&mut root);
         let mut renderer = MemoryRenderer::new(128, 128);
         let commands = ui.render().await?;
         renderer.render(commands).await?;

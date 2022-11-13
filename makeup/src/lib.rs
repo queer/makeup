@@ -2,12 +2,14 @@
 
 pub mod component;
 pub mod components;
+pub mod post_office;
 pub mod render;
 pub mod ui;
+pub mod util;
 
 pub use component::Component;
 pub use render::Renderer;
-pub use ui::UI;
+pub use ui::MUI;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DrawCommand {
@@ -17,9 +19,11 @@ pub enum DrawCommand {
 
 #[cfg(test)]
 mod tests {
+    use crate::component::{Key, Mailbox};
     use crate::components::EchoText;
     use crate::render::MemoryRenderer;
-    use crate::{Component, DrawCommand, Renderer, UI};
+    use crate::util::RwLocked;
+    use crate::{Component, DrawCommand, Renderer, MUI};
 
     use async_trait::async_trait;
     use eyre::Result;
@@ -28,13 +32,17 @@ mod tests {
     struct BasicComponent<'a> {
         #[allow(dead_code)]
         state: (),
-        children: Vec<&'a mut dyn Component<'a, Message = ()>>,
-        key: usize,
+        children: Vec<RwLocked<&'a mut dyn Component<Message = ()>>>,
+        key: Key,
     }
 
     #[async_trait]
-    impl<'a> Component<'a> for BasicComponent<'a> {
+    impl<'a> Component for BasicComponent<'a> {
         type Message = ();
+
+        async fn update(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+            Ok(())
+        }
 
         async fn render(&self) -> Result<Vec<DrawCommand>> {
             Ok(vec![DrawCommand::TextUnderCursor(
@@ -42,21 +50,25 @@ mod tests {
             )])
         }
 
-        async fn on_message(&mut self, _message: Self::Message) -> Result<Option<Self::Message>> {
-            Ok(Some(()))
+        async fn update_pass(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+            Ok(())
         }
 
-        fn children(&self) -> Vec<&dyn Component<'a, Message = Self::Message>> {
-            self.children.iter().map(|c| &**c).collect()
+        async fn render_pass(&self) -> Result<Vec<DrawCommand>> {
+            let mut out: Vec<DrawCommand> = vec![];
+            let mut render = self.render().await?;
+            out.append(&mut render);
+
+            for child in &self.children {
+                let child = child.read().await;
+                let mut render = child.render_pass().await?;
+                out.append(&mut render);
+            }
+
+            Ok(out)
         }
 
-        fn children_mut(
-            &'a mut self,
-        ) -> Option<&mut Vec<&mut dyn Component<'a, Message = Self::Message>>> {
-            Some(&mut self.children)
-        }
-
-        fn key(&self) -> usize {
+        fn key(&self) -> Key {
             self.key
         }
     }
@@ -69,7 +81,7 @@ mod tests {
             key: crate::component::generate_key(),
         };
 
-        let mut ui = UI::new(&mut root);
+        let ui = MUI::new(&mut root);
         let commands = ui.render().await?;
         let expected = "henol world".to_string();
         assert_eq!(
@@ -91,11 +103,11 @@ mod tests {
 
         let mut root = BasicComponent {
             state: (),
-            children: vec![&mut child],
+            children: vec![RwLocked::new(&mut child)],
             key: crate::component::generate_key(),
         };
 
-        let mut ui = UI::new(&mut root);
+        let ui = MUI::new(&mut root);
         let commands = ui.render().await?;
         assert_eq!(
             vec![

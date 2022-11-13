@@ -1,30 +1,39 @@
+use std::marker::PhantomData;
+
 use async_trait::async_trait;
 use eyre::Result;
 
+use crate::component::{Key, Mailbox};
 use crate::{Component, DrawCommand};
 
 #[derive(Debug)]
-pub struct PositionedText {
+pub struct PositionedText<Message: std::fmt::Debug + Send + Sync + Clone> {
     text: String,
     x: usize,
     y: usize,
-    key: usize,
+    key: Key,
+    _phantom: PhantomData<Message>,
 }
 
-impl PositionedText {
+impl<Message: std::fmt::Debug + Send + Sync + Clone> PositionedText<Message> {
     pub fn new<S: Into<String>>(text: S, x: usize, y: usize) -> Self {
         Self {
             text: text.into(),
             x,
             y,
             key: crate::component::generate_key(),
+            _phantom: PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<'a> Component<'a> for PositionedText {
-    type Message = ();
+impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedText<Message> {
+    type Message = Message;
+
+    async fn update(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+        Ok(())
+    }
 
     async fn render(&self) -> Result<Vec<DrawCommand>> {
         Ok(vec![DrawCommand::TextAt {
@@ -34,45 +43,41 @@ impl<'a> Component<'a> for PositionedText {
         }])
     }
 
-    async fn on_message(&mut self, _message: Self::Message) -> Result<Option<Self::Message>> {
-        Ok(None)
+    async fn update_pass(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+        Ok(())
     }
 
-    fn children(&self) -> Vec<&'a dyn Component<'a, Message = Self::Message>> {
-        vec![]
+    async fn render_pass(&self) -> Result<Vec<DrawCommand>> {
+        self.render().await
     }
 
-    fn children_mut(
-        &'a mut self,
-    ) -> Option<&'a mut Vec<&'a mut dyn Component<'a, Message = Self::Message>>> {
-        None
-    }
-
-    fn key(&self) -> usize {
+    fn key(&self) -> Key {
         self.key
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::PositionedText;
-    use crate::{Component, DrawCommand};
+    use crate::components::PositionedText;
+    use crate::render::MemoryRenderer;
+    use crate::{Renderer, MUI};
 
     use eyre::Result;
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
-        let root = PositionedText::new("henol world", 1, 1);
+        let mut root = PositionedText::new("henol world", 1, 1);
 
-        assert_eq!(
-            vec![DrawCommand::TextAt {
-                text: "henol world".to_string(),
-                x: 1,
-                y: 1
-            }]
-            .as_slice(),
-            root.render().await?.as_slice(),
-        );
+        let ui = MUI::<&'static str>::new(&mut root);
+        let mut renderer = MemoryRenderer::new(128, 128);
+        let commands = ui.render().await?;
+        renderer.render(commands).await?;
+
+        renderer.move_cursor(0, 0)?;
+        assert_eq!(" ", renderer.read_at_cursor(1)?);
+
+        renderer.move_cursor(1, 1)?;
+        assert_eq!("henol world".to_string(), renderer.read_at_cursor(11)?);
 
         Ok(())
     }

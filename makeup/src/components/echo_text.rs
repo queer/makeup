@@ -1,46 +1,49 @@
+use std::marker::PhantomData;
+
 use async_trait::async_trait;
 use eyre::Result;
 
+use crate::component::{Key, Mailbox};
 use crate::{Component, DrawCommand};
 
 #[derive(Debug)]
-pub struct EchoText {
+pub struct EchoText<Message: std::fmt::Debug + Send + Sync + Clone> {
     text: String,
-    key: usize,
+    key: Key,
+    _phantom: PhantomData<Message>,
 }
 
-impl EchoText {
+impl<Message: std::fmt::Debug + Send + Sync + Clone> EchoText<Message> {
     pub fn new<S: Into<String>>(text: S) -> Self {
         Self {
             text: text.into(),
             key: crate::component::generate_key(),
+            _phantom: PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<'a> Component<'a> for EchoText {
-    type Message = ();
+impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Message> {
+    type Message = Message;
+
+    async fn update(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+        Ok(())
+    }
 
     async fn render(&self) -> Result<Vec<DrawCommand>> {
         Ok(vec![DrawCommand::TextUnderCursor(self.text.clone())])
     }
 
-    async fn on_message(&mut self, _message: Self::Message) -> Result<Option<Self::Message>> {
-        Ok(None)
+    async fn update_pass(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+        Ok(())
     }
 
-    fn children(&self) -> Vec<&dyn Component<'a, Message = Self::Message>> {
-        vec![]
+    async fn render_pass(&self) -> Result<Vec<DrawCommand>> {
+        self.render().await
     }
 
-    fn children_mut(
-        &'a mut self,
-    ) -> Option<&mut Vec<&mut dyn Component<'a, Message = Self::Message>>> {
-        None
-    }
-
-    fn key(&self) -> usize {
+    fn key(&self) -> Key {
         self.key
     }
 }
@@ -54,7 +57,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
-        let root = EchoText::new("henol world");
+        let root = EchoText::<()>::new("henol world");
 
         assert_eq!(
             vec![DrawCommand::TextUnderCursor("henol world".to_string(),)].as_slice(),
