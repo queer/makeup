@@ -35,6 +35,19 @@ impl Renderer for MemoryRenderer {
                     self.cursor_x = x + text.len();
                     self.cursor_y = *y;
                 }
+                DrawCommand::MoveCursorRelative { x, y } => {
+                    let cursor_x = self.cursor_x as isize;
+                    let cursor_y = self.cursor_y as isize;
+
+                    self.bounds_check_relative(cursor_x + x, cursor_y + y)?;
+                    self.cursor_x = (cursor_x + *x) as usize;
+                    self.cursor_y = (cursor_y + *y) as usize;
+                }
+                DrawCommand::MoveCursorAbsolute { x, y } => {
+                    self.bounds_check(*x, *y)?;
+                    self.cursor_x = *x;
+                    self.cursor_y = *y;
+                }
             }
         }
         Ok(())
@@ -44,6 +57,16 @@ impl Renderer for MemoryRenderer {
         self.bounds_check(x, y)?;
         self.cursor_x = x;
         self.cursor_y = y;
+        Ok(())
+    }
+
+    async fn move_cursor_relative(&mut self, x: isize, y: isize) -> Result<()> {
+        let cursor_x = self.cursor_x as isize;
+        let cursor_y = self.cursor_y as isize;
+
+        self.bounds_check_relative(cursor_x + x, cursor_y + y)?;
+        self.cursor_x = (cursor_x + x) as usize;
+        self.cursor_y = (cursor_y + y) as usize;
         Ok(())
     }
 
@@ -59,6 +82,10 @@ impl Renderer for MemoryRenderer {
             result.push(*self.text.get(&(x + i, y)).unwrap_or(&' '));
         }
         Ok(result)
+    }
+
+    fn cursor(&self) -> (usize, usize) {
+        (self.cursor_x, self.cursor_y)
     }
 }
 
@@ -76,6 +103,14 @@ impl MemoryRenderer {
     // TODO: Should we just be truncating instead?
     fn bounds_check(&self, x: usize, y: usize) -> Result<()> {
         if x < self.width && y < self.height {
+            Ok(())
+        } else {
+            Err(RenderError::OutOfBounds(x as isize, y as isize).into())
+        }
+    }
+
+    fn bounds_check_relative(&self, x: isize, y: isize) -> Result<()> {
+        if x < self.width as isize && y < self.height as isize && x >= 0 && y >= 0 {
             Ok(())
         } else {
             Err(RenderError::OutOfBounds(x, y).into())

@@ -15,11 +15,13 @@ pub use ui::MUI;
 pub enum DrawCommand {
     TextUnderCursor(String),
     TextAt { x: usize, y: usize, text: String },
+    MoveCursorRelative { x: isize, y: isize },
+    MoveCursorAbsolute { x: usize, y: usize },
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::component::{Key, Mailbox};
+    use crate::component::{Key, UpdateContext};
     use crate::components::EchoText;
     use crate::render::MemoryRenderer;
     use crate::util::RwLocked;
@@ -40,7 +42,7 @@ mod tests {
     impl<'a> Component for BasicComponent<'a> {
         type Message = ();
 
-        async fn update(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+        async fn update(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
             Ok(())
         }
 
@@ -50,7 +52,7 @@ mod tests {
             )])
         }
 
-        async fn update_pass(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+        async fn update_pass(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
             Ok(())
         }
 
@@ -83,9 +85,9 @@ mod tests {
 
         let mut renderer = MemoryRenderer::new(128, 128);
         let ui = MUI::new(&mut root, &mut renderer);
-        ui.render().await?;
+        ui.render_frame().await?;
         let expected = "henol world".to_string();
-        ui.render().await?;
+        ui.render_frame().await?;
         renderer.move_cursor(0, 0).await?;
         assert_eq!(expected, renderer.read_at_cursor(expected.len()).await?);
 
@@ -104,7 +106,7 @@ mod tests {
 
         let mut renderer = MemoryRenderer::new(128, 128);
         let ui = MUI::new(&mut root, &mut renderer);
-        ui.render().await?;
+        ui.render_frame().await?;
 
         let expected = "henol world? wrong! banana".to_string();
         renderer.move_cursor(0, 0).await?;

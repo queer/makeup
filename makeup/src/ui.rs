@@ -1,8 +1,11 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_recursion::async_recursion;
+use either::Either;
 use eyre::Result;
 use tokio::sync::Mutex;
+use tokio::time::Instant;
 
 use crate::component::Key;
 use crate::post_office::PostOffice;
@@ -23,12 +26,41 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
         }
     }
 
+    #[allow(unreachable_code)]
     pub async fn render(&'a self) -> Result<()> {
+        // Enter alternate screen
+        print!("\x1b[?1049h");
+        // Clear screen
+        print!("{}", ansi_escapes::ClearScreen);
+        println!();
+        loop {
+            {
+                let mut renderer = self.renderer.write().await;
+                renderer.move_cursor(0, 0).await?;
+            }
+            self.render_frame().await?;
+        }
+        // Leave alternate screen
+        print!("\x1b[?1049l");
+    }
+
+    pub async fn render_frame(&'a self) -> Result<()> {
+        let frame_target = Duration::from_millis(1000 / 16);
+
+        let start = Instant::now();
         let ui = self.ui.lock().await;
         let commands = ui.render().await?;
 
         let mut renderer = self.renderer.write().await;
         renderer.render(&commands).await?;
+        let elapsed = start.elapsed();
+
+        if let Some(duration) = frame_target.checked_sub(elapsed) {
+            tokio::time::sleep(duration).await
+        } else {
+            // log::warn!("Frame took too long to render: {:?}", elapsed);
+        }
+
         Ok(())
     }
 
@@ -74,13 +106,35 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'a> UI<'a, M> {
         let post_office = post_office.clone();
         let mut post_office = post_office.lock().await;
         let mut component = component.write().await;
-        if let Some(messages) = post_office.mailbox(*component) {
-            (*component).update_pass(messages).await?;
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let sender = Arc::new(Mutex::new(tx));
+        (*component)
+            .update_pass(&mut (&mut *post_office, sender))
+            .await?;
+
+        while let Some((id, message)) = rx.recv().await {
+            match message {
+                Either::Left(left) => {
+                    post_office.send(id, left);
+                }
+                Either::Right(right) => {
+                    post_office.send_makeup(id, right);
+                }
+            }
         }
+
         Ok(())
     }
 
+    #[allow(unused)]
     pub async fn send(&self, key: usize, message: M) {
+        let mut post_office = self.post_office.lock().await;
+        post_office.send(key, message);
+    }
+
+    #[allow(unused)]
+    pub async fn send_makeup(&self, key: usize, message: M) {
         let mut post_office = self.post_office.lock().await;
         post_office.send(key, message);
     }
@@ -88,11 +142,12 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'a> UI<'a, M> {
 
 #[cfg(test)]
 mod tests {
-    use crate::component::{Key, Mailbox};
+    use crate::component::{Key, UpdateContext};
     use crate::render::MemoryRenderer;
     use crate::{Component, DrawCommand, MUI};
 
     use async_trait::async_trait;
+    use either::Either;
     use eyre::Result;
 
     #[derive(Debug)]
@@ -107,9 +162,16 @@ mod tests {
     impl Component for PingableComponent {
         type Message = String;
 
-        async fn update(&mut self, mailbox: &Mailbox<Self>) -> Result<()> {
-            if let Some("ping") = mailbox.iter().next().map(|s| s.as_str()) {
-                self.was_pinged = true;
+        async fn update(&mut self, ctx: &mut UpdateContext<Self>) -> Result<()> {
+            if let Some(mailbox) = ctx.0.mailbox(self) {
+                for msg in mailbox.iter() {
+                    if let Either::Left(cmd) = msg {
+                        if cmd == "ping" {
+                            self.was_pinged = true;
+                        }
+                    }
+                }
+                mailbox.clear();
             }
 
             Ok(())
@@ -123,8 +185,8 @@ mod tests {
             }
         }
 
-        async fn update_pass(&mut self, mailbox: &Mailbox<Self>) -> Result<()> {
-            self.update(mailbox).await
+        async fn update_pass(&mut self, ctx: &mut UpdateContext<Self>) -> Result<()> {
+            self.update(ctx).await
         }
 
         async fn render_pass(&self) -> Result<Vec<DrawCommand>> {
@@ -147,7 +209,7 @@ mod tests {
 
         let mut renderer = MemoryRenderer::new(128, 128);
         let ui = MUI::new(&mut root, &mut renderer);
-        ui.render().await?;
+        ui.render_frame().await?;
 
         {
             let mut renderer = ui.renderer().write().await;
@@ -156,7 +218,7 @@ mod tests {
         }
 
         ui.send(key, "ping".to_string()).await;
-        ui.render().await?;
+        ui.render_frame().await?;
 
         {
             let mut renderer = ui.renderer().write().await;

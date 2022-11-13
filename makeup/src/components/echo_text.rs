@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use eyre::Result;
 
-use crate::component::{Key, Mailbox};
+use crate::component::{Key, UpdateContext};
 use crate::{Component, DrawCommand};
 
 #[derive(Debug)]
@@ -27,7 +27,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> EchoText<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Message> {
     type Message = Message;
 
-    async fn update(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+    async fn update(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
         Ok(())
     }
 
@@ -35,7 +35,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
         Ok(vec![DrawCommand::TextUnderCursor(self.text.clone())])
     }
 
-    async fn update_pass(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+    async fn update_pass(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
         Ok(())
     }
 

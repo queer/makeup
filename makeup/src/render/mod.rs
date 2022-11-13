@@ -16,15 +16,19 @@ pub trait Renderer: std::fmt::Debug + AsAny {
 
     async fn move_cursor(&mut self, x: usize, y: usize) -> Result<()>;
 
+    async fn move_cursor_relative(&mut self, x: isize, y: isize) -> Result<()>;
+
     async fn read_at_cursor(&self, width: usize) -> Result<String>;
 
     async fn read_string(&self, x: usize, y: usize, width: usize) -> Result<String>;
+
+    fn cursor(&self) -> (usize, usize);
 }
 
 #[derive(Debug, Error)]
 pub enum RenderError {
     #[error("Coordinates ({0}, {1}) out of bounds!")]
-    OutOfBounds(usize, usize),
+    OutOfBounds(isize, isize),
 }
 
 #[cfg(test)]
@@ -41,7 +45,7 @@ mod tests {
 
         let mut renderer = MemoryRenderer::new(128, 128);
         let ui = MUI::<()>::new(&mut root, &mut renderer);
-        ui.render().await?;
+        ui.render_frame().await?;
 
         renderer.move_cursor(0, 0).await?;
         assert_eq!(

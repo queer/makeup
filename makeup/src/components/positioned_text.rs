@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use eyre::Result;
 
-use crate::component::{Key, Mailbox};
+use crate::component::{Key, UpdateContext};
 use crate::{Component, DrawCommand};
 
 #[derive(Debug)]
@@ -31,7 +31,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PositionedText<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedText<Message> {
     type Message = Message;
 
-    async fn update(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+    async fn update(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
         Ok(())
     }
 
@@ -43,7 +43,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedTex
         }])
     }
 
-    async fn update_pass(&mut self, _mailbox: &Mailbox<Self>) -> Result<()> {
+    async fn update_pass(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
         Ok(())
     }
 
@@ -70,7 +70,7 @@ mod tests {
 
         let mut renderer = MemoryRenderer::new(128, 128);
         let ui = MUI::<&'static str>::new(&mut root, &mut renderer);
-        ui.render().await?;
+        ui.render_frame().await?;
 
         renderer.move_cursor(0, 0).await?;
         assert_eq!(" ", renderer.read_at_cursor(1).await?);
