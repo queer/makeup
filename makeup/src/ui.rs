@@ -7,28 +7,38 @@ use tokio::sync::Mutex;
 use crate::component::Key;
 use crate::post_office::PostOffice;
 use crate::util::RwLocked;
-use crate::{Component, DrawCommand};
+use crate::{Component, DrawCommand, Renderer};
 
 #[derive(Debug)]
 pub struct MUI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
     ui: Mutex<UI<'a, M>>,
+    renderer: RwLocked<&'a mut dyn Renderer>,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
-    pub fn new(root: &'a mut dyn Component<Message = M>) -> Self {
+    pub fn new(root: &'a mut dyn Component<Message = M>, renderer: &'a mut dyn Renderer) -> Self {
         Self {
             ui: Mutex::new(UI::new(root)),
+            renderer: RwLocked::new(renderer),
         }
     }
 
-    pub async fn render(&'a self) -> Result<Vec<DrawCommand>> {
+    pub async fn render(&'a self) -> Result<()> {
         let ui = self.ui.lock().await;
-        ui.render().await
+        let commands = ui.render().await?;
+
+        let mut renderer = self.renderer.write().await;
+        renderer.render(&commands).await?;
+        Ok(())
     }
 
     pub async fn send(&self, key: Key, message: M) {
         let ui = self.ui.lock().await;
         ui.send(key, message).await;
+    }
+
+    pub fn renderer(&self) -> &RwLocked<&'a mut dyn Renderer> {
+        &self.renderer
     }
 }
 
@@ -80,7 +90,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'a> UI<'a, M> {
 mod tests {
     use crate::component::{Key, Mailbox};
     use crate::render::MemoryRenderer;
-    use crate::{Component, DrawCommand, Renderer, MUI};
+    use crate::{Component, DrawCommand, MUI};
 
     use async_trait::async_trait;
     use eyre::Result;
@@ -135,20 +145,24 @@ mod tests {
         };
         let key = root.key();
 
-        let ui = MUI::new(&mut root);
         let mut renderer = MemoryRenderer::new(128, 128);
-        let commands = ui.render().await?;
-        renderer.render(commands).await?;
+        let ui = MUI::new(&mut root, &mut renderer);
+        ui.render().await?;
 
-        renderer.move_cursor(0, 0)?;
-        assert_eq!("ping?".to_string(), renderer.read_at_cursor(5)?);
+        {
+            let mut renderer = ui.renderer().write().await;
+            renderer.move_cursor(0, 0).await?;
+            assert_eq!("ping?".to_string(), renderer.read_at_cursor(5).await?);
+        }
 
         ui.send(key, "ping".to_string()).await;
-        let commands = ui.render().await?;
-        renderer.render(commands).await?;
+        ui.render().await?;
 
-        renderer.move_cursor(0, 0)?;
-        assert_eq!("pong!".to_string(), renderer.read_at_cursor(5)?);
+        {
+            let mut renderer = ui.renderer().write().await;
+            renderer.move_cursor(0, 0).await?;
+            assert_eq!("pong!".to_string(), renderer.read_at_cursor(5).await?);
+        }
 
         Ok(())
     }

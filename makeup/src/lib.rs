@@ -81,18 +81,13 @@ mod tests {
             key: crate::component::generate_key(),
         };
 
-        let ui = MUI::new(&mut root);
-        let commands = ui.render().await?;
-        let expected = "henol world".to_string();
-        assert_eq!(
-            vec![DrawCommand::TextUnderCursor(expected.clone())].as_slice(),
-            commands.as_slice(),
-        );
-
         let mut renderer = MemoryRenderer::new(128, 128);
-        renderer.render(commands).await?;
-        renderer.move_cursor(0, 0)?;
-        assert_eq!(expected, renderer.read_at_cursor(expected.len())?);
+        let ui = MUI::new(&mut root, &mut renderer);
+        ui.render().await?;
+        let expected = "henol world".to_string();
+        ui.render().await?;
+        renderer.move_cursor(0, 0).await?;
+        assert_eq!(expected, renderer.read_at_cursor(expected.len()).await?);
 
         Ok(())
     }
@@ -107,23 +102,13 @@ mod tests {
             key: crate::component::generate_key(),
         };
 
-        let ui = MUI::new(&mut root);
-        let commands = ui.render().await?;
-        assert_eq!(
-            vec![
-                DrawCommand::TextUnderCursor("henol world".to_string()),
-                DrawCommand::TextUnderCursor("? wrong! banana!".to_string())
-            ]
-            .as_slice(),
-            commands.as_slice(),
-        );
-
         let mut renderer = MemoryRenderer::new(128, 128);
-        renderer.render(commands).await?;
+        let ui = MUI::new(&mut root, &mut renderer);
+        ui.render().await?;
 
         let expected = "henol world? wrong! banana".to_string();
-        renderer.move_cursor(0, 0)?;
-        assert_eq!(expected, renderer.read_at_cursor(expected.len())?);
+        renderer.move_cursor(0, 0).await?;
+        assert_eq!(expected, renderer.read_at_cursor(expected.len()).await?);
 
         Ok(())
     }

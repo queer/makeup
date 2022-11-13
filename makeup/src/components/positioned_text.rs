@@ -68,16 +68,18 @@ mod tests {
     async fn test_it_works() -> Result<()> {
         let mut root = PositionedText::new("henol world", 1, 1);
 
-        let ui = MUI::<&'static str>::new(&mut root);
         let mut renderer = MemoryRenderer::new(128, 128);
-        let commands = ui.render().await?;
-        renderer.render(commands).await?;
+        let ui = MUI::<&'static str>::new(&mut root, &mut renderer);
+        ui.render().await?;
 
-        renderer.move_cursor(0, 0)?;
-        assert_eq!(" ", renderer.read_at_cursor(1)?);
+        renderer.move_cursor(0, 0).await?;
+        assert_eq!(" ", renderer.read_at_cursor(1).await?);
 
-        renderer.move_cursor(1, 1)?;
-        assert_eq!("henol world".to_string(), renderer.read_at_cursor(11)?);
+        renderer.move_cursor(1, 1).await?;
+        assert_eq!(
+            "henol world".to_string(),
+            renderer.read_at_cursor(11).await?
+        );
 
         Ok(())
     }
