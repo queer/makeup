@@ -9,6 +9,8 @@ use tokio::sync::Mutex;
 use crate::{post_office::PostOffice, DrawCommand};
 
 pub type Key = usize;
+pub type DrawCommandBatch = (Key, Vec<DrawCommand>);
+
 pub type RawComponentMessage<M> = Either<M, MakeupMessage>;
 pub type ExtractMessageFromComponent<C> = <C as Component>::Message;
 pub type ComponentMessage<C> = RawComponentMessage<ExtractMessageFromComponent<C>>;
@@ -38,7 +40,7 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     async fn update(&mut self, mailbox: &mut UpdateContext<Self>) -> Result<()>;
 
     /// Render this component.
-    async fn render(&self) -> Result<Vec<DrawCommand>>;
+    async fn render(&self) -> Result<DrawCommandBatch>;
 
     /// An update pass for this component. Generally, this is implemented by
     /// calling [`Self::update`] and calling `::update` on any child
@@ -47,7 +49,7 @@ pub trait Component: std::fmt::Debug + Send + Sync {
 
     /// A render pass for this component. Generally, this is implemented by
     /// invoking `self.render()` and then calling `render` on each child.
-    async fn render_pass(&self) -> Result<Vec<DrawCommand>>;
+    async fn render_pass(&self) -> Result<Vec<DrawCommandBatch>>;
 
     /// A unique key for this component. See [`generate_key`].
     fn key(&self) -> Key;

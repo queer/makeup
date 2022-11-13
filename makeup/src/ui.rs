@@ -7,10 +7,10 @@ use eyre::Result;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 
-use crate::component::Key;
+use crate::component::{DrawCommandBatch, Key};
 use crate::post_office::PostOffice;
 use crate::util::RwLocked;
-use crate::{Component, DrawCommand, Renderer};
+use crate::{Ansi, Component, DisplayEraseMode, Renderer};
 
 #[derive(Debug)]
 pub struct MUI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
@@ -31,7 +31,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
         // Enter alternate screen
         print!("\x1b[?1049h");
         // Clear screen
-        print!("{}", ansi_escapes::ClearScreen);
+        print!("{}", Ansi::EraseInDisplay(DisplayEraseMode::All));
         println!();
         loop {
             {
@@ -91,7 +91,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'a> UI<'a, M> {
 
     /// Render the entire UI.
     // TODO: Graceful error handling...
-    pub async fn render(&self) -> Result<Vec<DrawCommand>> {
+    pub async fn render(&self) -> Result<Vec<DrawCommandBatch>> {
         Self::update_recursive(&self.root, self.post_office.clone()).await?;
         let root = &self.root.read().await;
         let draw_commands = root.render_pass().await?;
@@ -142,7 +142,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'a> UI<'a, M> {
 
 #[cfg(test)]
 mod tests {
-    use crate::component::{Key, UpdateContext};
+    use crate::component::{DrawCommandBatch, Key, UpdateContext};
     use crate::render::MemoryRenderer;
     use crate::{Component, DrawCommand, MUI};
 
@@ -177,11 +177,17 @@ mod tests {
             Ok(())
         }
 
-        async fn render(&self) -> Result<Vec<DrawCommand>> {
+        async fn render(&self) -> Result<DrawCommandBatch> {
             if !self.was_pinged {
-                Ok(vec![DrawCommand::TextUnderCursor("ping?".to_string())])
+                Ok((
+                    self.key,
+                    vec![DrawCommand::TextUnderCursor("ping?".to_string())],
+                ))
             } else {
-                Ok(vec![DrawCommand::TextUnderCursor("pong!".to_string())])
+                Ok((
+                    self.key,
+                    vec![DrawCommand::TextUnderCursor("pong!".to_string())],
+                ))
             }
         }
 
@@ -189,8 +195,8 @@ mod tests {
             self.update(ctx).await
         }
 
-        async fn render_pass(&self) -> Result<Vec<DrawCommand>> {
-            self.render().await
+        async fn render_pass(&self) -> Result<Vec<DrawCommandBatch>> {
+            Ok(vec![self.render().await?])
         }
 
         fn key(&self) -> Key {

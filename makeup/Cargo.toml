@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ansi-escapes = "0.1.1"
 async-recursion = "1.0.0"
 async-trait = "0.1.58"
 either = "1.8.0"
@@ -15,3 +14,6 @@ futures-util = "0.3.25"
 rand = "0.8.5"
 thiserror = "1.0.37"
 tokio = { version = "1.21.2", features = ["full"] }
+
+[dependencies.makeup-ansi]
+path = "../makeup-ansi"

@@ -1,10 +1,10 @@
 use std::io::Write;
 
-use ansi_escapes::*;
 use async_trait::async_trait;
 use eyre::Result;
 
-use crate::DrawCommand;
+use crate::component::DrawCommandBatch;
+use crate::{Ansi, DrawCommand};
 
 use super::{MemoryRenderer, Renderer};
 
@@ -24,26 +24,43 @@ impl TerminalRenderer {
 
 #[async_trait]
 impl Renderer for TerminalRenderer {
-    async fn render(&mut self, commands: &[DrawCommand]) -> Result<()> {
+    async fn render(&mut self, commands: &[DrawCommandBatch]) -> Result<()> {
         self.memory_renderer.render(commands).await?;
 
-        for command in commands {
-            match command {
-                DrawCommand::TextUnderCursor(text) => {
-                    print!("{}", text);
-                }
-                DrawCommand::TextAt { x, y, text } => {
-                    print!(
-                        "{}{}",
-                        CursorTo::AbsoluteXY(*y as u16, (*x + text.len()) as u16),
-                        text
-                    );
-                }
-                DrawCommand::MoveCursorRelative { x, y } => {
-                    print!("{}", CursorMove::XY(*x as i16, *y as i16));
-                }
-                DrawCommand::MoveCursorAbsolute { x, y } => {
-                    print!("{}", CursorTo::AbsoluteXY(*x as u16, *y as u16));
+        for (_key, commands) in commands {
+            // debug!("rendering to terminal: {}", key);
+            for command in commands {
+                match command {
+                    DrawCommand::TextUnderCursor(text) => {
+                        print!("{}", text);
+                    }
+                    DrawCommand::TextAt { x, y, text } => {
+                        print!("{}{}", Ansi::CursorPosition(*x, *y), text);
+                    }
+                    DrawCommand::MoveCursorRelative { x, y } => {
+                        match x.cmp(&0) {
+                            std::cmp::Ordering::Less => {
+                                print!("{}", Ansi::CursorLeft(-x as usize));
+                            }
+                            std::cmp::Ordering::Equal => {}
+                            std::cmp::Ordering::Greater => {
+                                print!("{}", Ansi::CursorRight(*x as usize));
+                            }
+                        }
+
+                        match y.cmp(&0) {
+                            std::cmp::Ordering::Less => {
+                                print!("{}", Ansi::CursorUp(-y as usize));
+                            }
+                            std::cmp::Ordering::Equal => {}
+                            std::cmp::Ordering::Greater => {
+                                print!("{}", Ansi::CursorDown(*y as usize));
+                            }
+                        }
+                    }
+                    DrawCommand::MoveCursorAbsolute { x, y } => {
+                        print!("{}", Ansi::CursorPosition(*x, *y));
+                    }
                 }
             }
         }
@@ -56,13 +73,31 @@ impl Renderer for TerminalRenderer {
 
     async fn move_cursor(&mut self, x: usize, y: usize) -> eyre::Result<()> {
         let res = self.memory_renderer.move_cursor(x, y).await;
-        print!("{}", CursorTo::AbsoluteXY(y as u16, x as u16));
+        print!("{}", Ansi::CursorPosition(x, y),);
         res
     }
 
     async fn move_cursor_relative(&mut self, x: isize, y: isize) -> eyre::Result<()> {
         let res = self.memory_renderer.move_cursor_relative(x, y).await;
-        print!("{}", CursorMove::XY(x as i16, y as i16));
+        match x.cmp(&0) {
+            std::cmp::Ordering::Less => {
+                print!("{}", Ansi::CursorLeft(-x as usize));
+            }
+            std::cmp::Ordering::Equal => {}
+            std::cmp::Ordering::Greater => {
+                print!("{}", Ansi::CursorRight(x as usize));
+            }
+        }
+
+        match y.cmp(&0) {
+            std::cmp::Ordering::Less => {
+                print!("{}", Ansi::CursorUp(-y as usize));
+            }
+            std::cmp::Ordering::Equal => {}
+            std::cmp::Ordering::Greater => {
+                print!("{}", Ansi::CursorDown(y as usize));
+            }
+        }
         res
     }
 

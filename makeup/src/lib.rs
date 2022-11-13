@@ -11,6 +11,8 @@ pub use component::Component;
 pub use render::Renderer;
 pub use ui::MUI;
 
+pub use makeup_ansi::prelude::*;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DrawCommand {
     TextUnderCursor(String),
@@ -21,7 +23,7 @@ pub enum DrawCommand {
 
 #[cfg(test)]
 mod tests {
-    use crate::component::{Key, UpdateContext};
+    use crate::component::{DrawCommandBatch, Key, UpdateContext};
     use crate::components::EchoText;
     use crate::render::MemoryRenderer;
     use crate::util::RwLocked;
@@ -46,20 +48,21 @@ mod tests {
             Ok(())
         }
 
-        async fn render(&self) -> Result<Vec<DrawCommand>> {
-            Ok(vec![DrawCommand::TextUnderCursor(
-                "henol world".to_string(),
-            )])
+        async fn render(&self) -> Result<DrawCommandBatch> {
+            Ok((
+                self.key,
+                vec![DrawCommand::TextUnderCursor("henol world".to_string())],
+            ))
         }
 
         async fn update_pass(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
             Ok(())
         }
 
-        async fn render_pass(&self) -> Result<Vec<DrawCommand>> {
-            let mut out: Vec<DrawCommand> = vec![];
-            let mut render = self.render().await?;
-            out.append(&mut render);
+        async fn render_pass(&self) -> Result<Vec<DrawCommandBatch>> {
+            let mut out = vec![];
+            let render = self.render().await?;
+            out.push(render);
 
             for child in &self.children {
                 let child = child.read().await;

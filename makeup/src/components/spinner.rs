@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use either::Either;
 use eyre::Result;
 
-use crate::component::{Key, MakeupMessage, UpdateContext};
+use crate::component::{DrawCommandBatch, Key, MakeupMessage, UpdateContext};
 use crate::{Component, DrawCommand};
 
 #[derive(Debug)]
@@ -76,20 +76,23 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
         Ok(())
     }
 
-    async fn render(&self) -> Result<Vec<DrawCommand>> {
-        Ok(vec![
-            DrawCommand::TextUnderCursor(self.spin_steps[self.step].to_string()),
-            DrawCommand::TextUnderCursor(" ".to_string()),
-            DrawCommand::TextUnderCursor(self.text.clone()),
-        ])
+    async fn render(&self) -> Result<DrawCommandBatch> {
+        Ok((
+            self.key,
+            vec![
+                DrawCommand::TextUnderCursor(self.spin_steps[self.step].to_string()),
+                DrawCommand::TextUnderCursor(" ".to_string()),
+                DrawCommand::TextUnderCursor(self.text.clone()),
+            ],
+        ))
     }
 
     async fn update_pass(&mut self, ctx: &mut UpdateContext<Self>) -> Result<()> {
         self.update(ctx).await
     }
 
-    async fn render_pass(&self) -> Result<Vec<DrawCommand>> {
-        self.render().await
+    async fn render_pass(&self) -> Result<Vec<DrawCommandBatch>> {
+        Ok(vec![self.render().await?])
     }
 
     fn key(&self) -> Key {
@@ -116,6 +119,7 @@ mod tests {
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
         let sender = Arc::new(Mutex::new(tx));
 
+        let (_k, render) = root.render().await?;
         assert_eq!(
             vec![
                 DrawCommand::TextUnderCursor("-".into()),
@@ -123,7 +127,7 @@ mod tests {
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ]
             .as_slice(),
-            root.render().await?.as_slice(),
+            render.as_slice(),
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(1));
@@ -131,6 +135,7 @@ mod tests {
         root.update_pass(&mut (&mut post_office, sender.clone()))
             .await?;
 
+        let (_k, render) = root.render().await?;
         assert_eq!(
             vec![
                 DrawCommand::TextUnderCursor("\\".into()),
@@ -138,7 +143,7 @@ mod tests {
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ]
             .as_slice(),
-            root.render().await?.as_slice(),
+            render.as_slice(),
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(1));
@@ -146,6 +151,7 @@ mod tests {
         root.update_pass(&mut (&mut post_office, sender.clone()))
             .await?;
 
+        let (_k, render) = root.render().await?;
         assert_eq!(
             vec![
                 DrawCommand::TextUnderCursor("|".into()),
@@ -153,7 +159,7 @@ mod tests {
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ]
             .as_slice(),
-            root.render().await?.as_slice(),
+            render.as_slice(),
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(1));
@@ -161,6 +167,7 @@ mod tests {
         root.update_pass(&mut (&mut post_office, sender.clone()))
             .await?;
 
+        let (_k, render) = root.render().await?;
         assert_eq!(
             vec![
                 DrawCommand::TextUnderCursor("/".into()),
@@ -168,7 +175,7 @@ mod tests {
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ]
             .as_slice(),
-            root.render().await?.as_slice(),
+            render.as_slice(),
         );
 
         Ok(())

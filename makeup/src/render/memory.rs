@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use eyre::Result;
 
 use super::RenderError;
-use crate::{DrawCommand, Renderer};
+use crate::{component::DrawCommandBatch, DrawCommand, Renderer};
 
 #[derive(Debug)]
 pub struct MemoryRenderer {
@@ -15,38 +15,41 @@ pub struct MemoryRenderer {
 
 #[async_trait]
 impl Renderer for MemoryRenderer {
-    async fn render(&mut self, commands: &[DrawCommand]) -> Result<()> {
-        for command in commands {
-            match command {
-                DrawCommand::TextUnderCursor(text) => {
-                    self.bounds_check(self.cursor_x, self.cursor_y)?;
-                    self.bounds_check(self.cursor_x + text.len(), self.cursor_y)?;
-                    for (i, c) in text.chars().enumerate() {
-                        self.text.insert((self.cursor_x + i, self.cursor_y), c);
+    async fn render(&mut self, commands: &[DrawCommandBatch]) -> Result<()> {
+        for (_key, commands) in commands {
+            // debug!("rendering to terminal: {}", key);
+            for command in commands {
+                match command {
+                    DrawCommand::TextUnderCursor(text) => {
+                        self.bounds_check(self.cursor_x, self.cursor_y)?;
+                        self.bounds_check(self.cursor_x + text.len(), self.cursor_y)?;
+                        for (i, c) in text.chars().enumerate() {
+                            self.text.insert((self.cursor_x + i, self.cursor_y), c);
+                        }
+                        self.cursor_x += text.len();
                     }
-                    self.cursor_x += text.len();
-                }
-                DrawCommand::TextAt { x, y, text } => {
-                    self.bounds_check(*x, *y)?;
-                    self.bounds_check(*x + text.len(), *y)?;
-                    for (i, c) in text.chars().enumerate() {
-                        self.text.insert((x + i, *y), c);
+                    DrawCommand::TextAt { x, y, text } => {
+                        self.bounds_check(*x, *y)?;
+                        self.bounds_check(*x + text.len(), *y)?;
+                        for (i, c) in text.chars().enumerate() {
+                            self.text.insert((x + i, *y), c);
+                        }
+                        self.cursor_x = x + text.len();
+                        self.cursor_y = *y;
                     }
-                    self.cursor_x = x + text.len();
-                    self.cursor_y = *y;
-                }
-                DrawCommand::MoveCursorRelative { x, y } => {
-                    let cursor_x = self.cursor_x as isize;
-                    let cursor_y = self.cursor_y as isize;
+                    DrawCommand::MoveCursorRelative { x, y } => {
+                        let cursor_x = self.cursor_x as isize;
+                        let cursor_y = self.cursor_y as isize;
 
-                    self.bounds_check_relative(cursor_x + x, cursor_y + y)?;
-                    self.cursor_x = (cursor_x + *x) as usize;
-                    self.cursor_y = (cursor_y + *y) as usize;
-                }
-                DrawCommand::MoveCursorAbsolute { x, y } => {
-                    self.bounds_check(*x, *y)?;
-                    self.cursor_x = *x;
-                    self.cursor_y = *y;
+                        self.bounds_check_relative(cursor_x + x, cursor_y + y)?;
+                        self.cursor_x = (cursor_x + *x) as usize;
+                        self.cursor_y = (cursor_y + *y) as usize;
+                    }
+                    DrawCommand::MoveCursorAbsolute { x, y } => {
+                        self.bounds_check(*x, *y)?;
+                        self.cursor_x = *x;
+                        self.cursor_y = *y;
+                    }
                 }
             }
         }

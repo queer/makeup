@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use eyre::Result;
 use thiserror::Error;
 
+use crate::component::DrawCommandBatch;
 use crate::util::AsAny;
-use crate::DrawCommand;
 
 pub mod memory;
 pub mod terminal;
@@ -12,7 +12,7 @@ pub use memory::MemoryRenderer;
 
 #[async_trait]
 pub trait Renderer: std::fmt::Debug + AsAny {
-    async fn render(&mut self, commands: &[DrawCommand]) -> Result<()>;
+    async fn render(&mut self, commands: &[DrawCommandBatch]) -> Result<()>;
 
     async fn move_cursor(&mut self, x: usize, y: usize) -> Result<()>;
 

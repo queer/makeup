@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use eyre::Result;
 
-use crate::component::{Key, UpdateContext};
+use crate::component::{DrawCommandBatch, Key, UpdateContext};
 use crate::{Component, DrawCommand};
 
 #[derive(Debug)]
@@ -35,20 +35,23 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedTex
         Ok(())
     }
 
-    async fn render(&self) -> Result<Vec<DrawCommand>> {
-        Ok(vec![DrawCommand::TextAt {
-            text: self.text.clone(),
-            x: self.x,
-            y: self.y,
-        }])
+    async fn render(&self) -> Result<DrawCommandBatch> {
+        Ok((
+            self.key,
+            vec![DrawCommand::TextAt {
+                text: self.text.clone(),
+                x: self.x,
+                y: self.y,
+            }],
+        ))
     }
 
     async fn update_pass(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
         Ok(())
     }
 
-    async fn render_pass(&self) -> Result<Vec<DrawCommand>> {
-        self.render().await
+    async fn render_pass(&self) -> Result<Vec<DrawCommandBatch>> {
+        Ok(vec![self.render().await?])
     }
 
     fn key(&self) -> Key {

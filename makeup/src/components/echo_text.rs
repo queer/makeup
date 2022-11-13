@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use eyre::Result;
 
-use crate::component::{Key, UpdateContext};
+use crate::component::{DrawCommandBatch, Key, UpdateContext};
 use crate::{Component, DrawCommand};
 
 #[derive(Debug)]
@@ -31,16 +31,19 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
         Ok(())
     }
 
-    async fn render(&self) -> Result<Vec<DrawCommand>> {
-        Ok(vec![DrawCommand::TextUnderCursor(self.text.clone())])
+    async fn render(&self) -> Result<DrawCommandBatch> {
+        Ok((
+            self.key,
+            vec![DrawCommand::TextUnderCursor(self.text.clone())],
+        ))
     }
 
     async fn update_pass(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
         Ok(())
     }
 
-    async fn render_pass(&self) -> Result<Vec<DrawCommand>> {
-        self.render().await
+    async fn render_pass(&self) -> Result<Vec<DrawCommandBatch>> {
+        Ok(vec![self.render().await?])
     }
 
     fn key(&self) -> Key {
@@ -59,9 +62,10 @@ mod tests {
     async fn test_it_works() -> Result<()> {
         let root = EchoText::<()>::new("henol world");
 
+        let (_k, render) = root.render().await?;
         assert_eq!(
             vec![DrawCommand::TextUnderCursor("henol world".to_string(),)].as_slice(),
-            root.render().await?.as_slice(),
+            render.as_slice(),
         );
 
         Ok(())
