@@ -8,16 +8,21 @@ use crate::{Ansi, DrawCommand};
 
 use super::{MemoryRenderer, Renderer};
 
+/// A [`Renderer`] that renders to a terminal.
 #[derive(Debug)]
 pub struct TerminalRenderer {
     memory_renderer: MemoryRenderer,
+    saved_position: bool,
 }
 
 impl TerminalRenderer {
-    pub fn new(width: usize, height: usize) -> Self {
-        // TODO: Read terminal size
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        let (w, h) = ioctls::get_terminal_size();
+
         Self {
-            memory_renderer: MemoryRenderer::new(width, height),
+            memory_renderer: MemoryRenderer::new(w, h),
+            saved_position: false,
         }
     }
 }
@@ -25,7 +30,16 @@ impl TerminalRenderer {
 #[async_trait]
 impl Renderer for TerminalRenderer {
     async fn render(&mut self, commands: &[DrawCommandBatch]) -> Result<()> {
-        self.memory_renderer.render(commands).await?;
+        // Save the cursor position before each render, and restore it after.
+        // Not restoring the cursor position until we've saved it the first
+        // time ensures that ex. the cursor will be positioned at the expected
+        // character when rendering.
+        if self.saved_position {
+            print!("{}", Ansi::RestoreCursorPosition);
+        } else {
+            self.saved_position = true;
+        }
+        print!("{}", Ansi::SaveCursorPosition);
 
         for (_key, commands) in commands {
             // debug!("rendering to terminal: {}", key);
@@ -111,5 +125,23 @@ impl Renderer for TerminalRenderer {
 
     fn cursor(&self) -> (usize, usize) {
         self.memory_renderer.cursor()
+    }
+}
+
+mod ioctls {
+    pub fn get_terminal_size() -> (usize, usize) {
+        use std::mem::zeroed;
+
+        // Safety: Unfortuantely no other way to do this, ioctls suck.
+        #[allow(unsafe_code)]
+        unsafe {
+            let mut size: libc::winsize = zeroed();
+            // https://github.com/rust-lang/libc/pull/704
+            // FIXME: ".into()" used as a temporary fix for a libc bug
+            match libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut size) {
+                0 => (size.ws_col as usize, size.ws_row as usize),
+                _ => (80, 24),
+            }
+        }
     }
 }

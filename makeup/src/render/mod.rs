@@ -10,6 +10,13 @@ pub mod terminal;
 
 pub use memory::MemoryRenderer;
 
+/// A `Renderer` takes in a slice of [`DrawCommandBatch`]es and renders them
+/// somehow. No constraints are placed on rendering, ie a renderer can use any
+/// backend it sees fit. Built-in renderers include [`MemoryRenderer`] and
+/// [`TerminalRenderer`].
+///
+/// Renderers that might be useful to implement on your own are things like:
+/// - A renderer that can render to a canvas backend, for trivial WASM parity
 #[async_trait]
 pub trait Renderer: std::fmt::Debug + AsAny {
     async fn render(&mut self, commands: &[DrawCommandBatch]) -> Result<()>;
@@ -25,6 +32,7 @@ pub trait Renderer: std::fmt::Debug + AsAny {
     fn cursor(&self) -> (usize, usize);
 }
 
+/// An error that occurred during rendering.
 #[derive(Debug, Error)]
 pub enum RenderError {
     #[error("Coordinates ({0}, {1}) out of bounds!")]

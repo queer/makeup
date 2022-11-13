@@ -6,6 +6,7 @@ use eyre::Result;
 use crate::component::{DrawCommandBatch, Key, UpdateContext};
 use crate::{Component, DrawCommand};
 
+/// A simple component that renders text under the cursor.
 #[derive(Debug)]
 pub struct EchoText<Message: std::fmt::Debug + Send + Sync + Clone> {
     text: String,

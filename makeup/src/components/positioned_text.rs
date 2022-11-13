@@ -6,6 +6,7 @@ use eyre::Result;
 use crate::component::{DrawCommandBatch, Key, UpdateContext};
 use crate::{Component, DrawCommand};
 
+/// Simple component that renders text at the given (x, y).
 #[derive(Debug)]
 pub struct PositionedText<Message: std::fmt::Debug + Send + Sync + Clone> {
     text: String,

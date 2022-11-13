@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
+/// Helper struct to make dealing with an `Arc<RwLock<T>>` easier.
 #[derive(Debug)]
 pub struct RwLocked<T> {
     inner: Arc<RwLock<T>>,
@@ -31,6 +32,7 @@ impl<T> RwLocked<T> {
     }
 }
 
+/// Downcsat any type into [`Any`].
 pub trait AsAny {
     fn as_any(&self) -> &dyn std::any::Any;
 

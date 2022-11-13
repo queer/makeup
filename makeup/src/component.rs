@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use either::Either;
@@ -8,23 +9,40 @@ use tokio::sync::Mutex;
 
 use crate::{post_office::PostOffice, DrawCommand};
 
+/// A key that uniquely identifies a [`Component`].
 pub type Key = usize;
+
+/// A [`Key`]ed batch of [`DrawCommand`]s.
 pub type DrawCommandBatch = (Key, Vec<DrawCommand>);
 
+/// The exact message type that can be sent to a component. Either the
+/// component's associated `Message` type, or a [`MakeupMessage`].
 pub type RawComponentMessage<M> = Either<M, MakeupMessage>;
+
+/// The associated `Message` type of a [`Component`].
 pub type ExtractMessageFromComponent<C> = <C as Component>::Message;
+
+/// The type of messages that can be sent to the given [`Component`].
 pub type ComponentMessage<C> = RawComponentMessage<ExtractMessageFromComponent<C>>;
+
+/// A mailbox for a component.
 pub type Mailbox<C> = Vec<ComponentMessage<C>>;
+
+/// An [`UnboundedSender`] that can be used to send messages to a component
+/// during the [`Component::update_pass`] loop.
 pub type ContextSender<C> = Arc<Mutex<UnboundedSender<(Key, ComponentMessage<C>)>>>;
+
+/// The context for a component's update lifecycle.
 // TODO: Figure out the type magic to lift this into a real struct
 pub type UpdateContext<'a, C> = (
     &'a mut PostOffice<ExtractMessageFromComponent<C>>,
     ContextSender<C>,
 );
 
+/// A default message that can be sent to a component.
 #[derive(Debug, Clone)]
 pub enum MakeupMessage {
-    TimerTick(usize),
+    TimerTick(Duration),
 }
 
 /// A component in a makeup UI. Stateless components can be implemented via
@@ -55,6 +73,7 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     fn key(&self) -> Key;
 }
 
+/// Generate a most-likely-unique key for a component.
 pub fn generate_key() -> Key {
     rand::random::<usize>()
 }

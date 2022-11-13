@@ -8,6 +8,7 @@ use eyre::Result;
 use crate::component::{DrawCommandBatch, Key, MakeupMessage, UpdateContext};
 use crate::{Component, DrawCommand};
 
+/// A simple component that renders a spinner with the given text.
 #[derive(Debug)]
 pub struct Spinner<Message: std::fmt::Debug + Send + Sync + Clone> {
     text: String,
@@ -15,17 +16,19 @@ pub struct Spinner<Message: std::fmt::Debug + Send + Sync + Clone> {
     step: usize,
     key: Key,
     started: bool,
+    interval: Duration,
     _phantom: PhantomData<Message>,
 }
 
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Spinner<Message> {
-    pub fn new<S: Into<String>>(text: S, spin_steps: Vec<char>) -> Self {
+    pub fn new<S: Into<String>>(text: S, spin_steps: Vec<char>, interval: Duration) -> Self {
         Self {
             text: text.into(),
             spin_steps,
             step: 0,
             key: crate::component::generate_key(),
             started: false,
+            interval,
             _phantom: PhantomData,
         }
     }
@@ -41,7 +44,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
             let sender = ctx.1.clone();
             let sender = sender.lock().await;
             let key = self.key();
-            sender.send((key, Either::Right(MakeupMessage::TimerTick(250))))?;
+            sender.send((key, Either::Right(MakeupMessage::TimerTick(self.interval))))?;
         }
 
         if let Some(mailbox) = ctx.0.mailbox(self) {
@@ -55,11 +58,12 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
                             self.step = (self.step + 1) % self.spin_steps.len();
                             let key = self.key();
                             let sender = ctx.1.clone();
+                            let interval = self.interval;
                             tokio::spawn(async move {
-                                tokio::time::sleep(Duration::from_millis(250)).await;
+                                tokio::time::sleep(interval).await;
                                 let sender = sender.lock().await;
                                 match sender
-                                    .send((key, Either::Right(MakeupMessage::TimerTick(250))))
+                                    .send((key, Either::Right(MakeupMessage::TimerTick(interval))))
                                 {
                                     Ok(_) => {}
                                     Err(err) => {
@@ -103,6 +107,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+    use std::time::Duration;
 
     use super::Spinner;
     use crate::component::MakeupMessage;
@@ -114,7 +119,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
-        let mut root = Spinner::<()>::new("henol world", vec!['-', '\\', '|', '/']);
+        let interval = Duration::from_millis(1);
+        let mut root = Spinner::<()>::new("henol world", vec!['-', '\\', '|', '/'], interval);
         let mut post_office = PostOffice::<()>::new();
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
         let sender = Arc::new(Mutex::new(tx));
@@ -130,7 +136,7 @@ mod tests {
             render.as_slice(),
         );
 
-        post_office.send_makeup(root.key(), MakeupMessage::TimerTick(1));
+        post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
         post_office.send(root.key(), ());
         root.update_pass(&mut (&mut post_office, sender.clone()))
             .await?;
@@ -146,7 +152,7 @@ mod tests {
             render.as_slice(),
         );
 
-        post_office.send_makeup(root.key(), MakeupMessage::TimerTick(1));
+        post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
         post_office.send(root.key(), ());
         root.update_pass(&mut (&mut post_office, sender.clone()))
             .await?;
@@ -162,7 +168,7 @@ mod tests {
             render.as_slice(),
         );
 
-        post_office.send_makeup(root.key(), MakeupMessage::TimerTick(1));
+        post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
         post_office.send(root.key(), ());
         root.update_pass(&mut (&mut post_office, sender.clone()))
             .await?;

@@ -4,6 +4,7 @@ use eyre::Result;
 use super::RenderError;
 use crate::{component::DrawCommandBatch, DrawCommand, Renderer};
 
+/// A [`Renderer`] that renders to an in-memory grid.
 #[derive(Debug)]
 pub struct MemoryRenderer {
     cursor_x: usize,

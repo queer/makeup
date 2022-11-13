@@ -13,6 +13,7 @@ macro_rules! ansi {
     ($( $l:expr ),*) => { concat!("\x1B[", $( $l ),*) };
 }
 
+/// ANSI escape sequences. Can be directly formatted into strings.
 pub enum Ansi {
     // Cursor manipulation
     /// Set the (x, y) cursor position.
@@ -70,6 +71,7 @@ pub enum Ansi {
 }
 
 impl Ansi {
+    /// Render this ANSI escape sequence into the given `Write`able.
     pub fn render(&self, f: &mut impl std::fmt::Write) -> Result<()> {
         match self {
             // Cursor
@@ -326,6 +328,7 @@ impl Ansi {
         .map_err(|e| e.into())
     }
 
+    /// Convert a hex colour to RGB.
     fn rgb(hex: &u32) -> (u32, u32, u32) {
         let r = (hex >> 16) & 0xFF;
         let g = (hex >> 8) & 0xFF;
@@ -340,6 +343,7 @@ impl std::fmt::Display for Ansi {
     }
 }
 
+/// Terminal cursor styles.
 pub enum CursorStyle {
     /// The cursor is a block.
     Block,
@@ -351,6 +355,7 @@ pub enum CursorStyle {
     HollowBlock,
 }
 
+/// Terminal cursor visibility.
 pub enum CursorVisibility {
     /// The cursor is visible.
     Visible,
@@ -359,6 +364,7 @@ pub enum CursorVisibility {
     Invisible,
 }
 
+/// Default 8-bit colour palette.
 #[derive(Clone, Copy)]
 pub enum Colour {
     /// Black.
@@ -411,11 +417,13 @@ pub enum Colour {
 }
 
 impl Colour {
+    /// Index in the enum.
     pub fn index(&self) -> usize {
         *self as usize
     }
 }
 
+/// Erase part or all of the current display.
 pub enum DisplayEraseMode {
     /// Erase from the cursor to the end of the display.
     FromCursorToEnd,
@@ -430,7 +438,7 @@ pub enum DisplayEraseMode {
     ScrollbackBuffer,
 }
 
-/// Erase part of the current line. Does not move the cursor.
+/// Erase part or all of the current line. Does not move the cursor.
 pub enum LineEraseMode {
     /// Erase from the cursor to the end of the line.
     FromCursorToEnd,
@@ -442,6 +450,7 @@ pub enum LineEraseMode {
     All,
 }
 
+/// See: https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters
 pub enum SgrParameter {
     /// Reset all attributes.
     Reset,

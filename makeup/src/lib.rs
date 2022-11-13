@@ -13,11 +13,22 @@ pub use ui::MUI;
 
 pub use makeup_ansi::prelude::*;
 
+/// Commands for drawing to the character grid. Draw commands are processed by
+/// the current [`Renderer`].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DrawCommand {
+    /// Draw text under the cursor, advancing the cursor by `text.len()`
+    /// characters.
     TextUnderCursor(String),
+
+    /// Draw text at the given (x, y), moving the cursor to
+    /// `(x + text.len(), y)`.
     TextAt { x: usize, y: usize, text: String },
+
+    /// Move the cursor relative to its current position.
     MoveCursorRelative { x: isize, y: isize },
+
+    /// Move the cursor absolutely.
     MoveCursorAbsolute { x: usize, y: usize },
 }
 
