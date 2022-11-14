@@ -15,7 +15,7 @@ pub use makeup_ansi::prelude::*;
 
 /// Commands for drawing to the character grid. Draw commands are processed by
 /// the current [`Renderer`].
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DrawCommand {
     /// Draw text under the cursor, advancing the cursor by `text.len()`
     /// characters.

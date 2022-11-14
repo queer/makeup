@@ -15,6 +15,7 @@ rand = "0.8.5"
 thiserror = "1.0.37"
 tokio = { version = "1.21.2", features = ["full"] }
 libc = "0.2.137"
+fnv = "1.0.7"
 
 [dependencies.makeup-ansi]
 path = "../makeup-ansi"

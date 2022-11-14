@@ -1,3 +1,4 @@
+use std::hash::{Hash, Hasher};
 use std::io::Write;
 
 use async_trait::async_trait;
@@ -13,6 +14,22 @@ use super::{MemoryRenderer, Renderer};
 pub struct TerminalRenderer {
     memory_renderer: MemoryRenderer,
     saved_position: bool,
+    hasher: Fnv,
+    last_render_hash: Option<u64>,
+}
+
+struct Fnv(fnv::FnvHasher);
+
+impl Fnv {
+    pub fn reset(&mut self) {
+        self.0 = fnv::FnvHasher::default();
+    }
+}
+
+impl std::fmt::Debug for Fnv {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Fnv").field(&self.0.finish()).finish()
+    }
 }
 
 impl TerminalRenderer {
@@ -23,6 +40,8 @@ impl TerminalRenderer {
         Self {
             memory_renderer: MemoryRenderer::new(w, h),
             saved_position: false,
+            hasher: Fnv(fnv::FnvHasher::default()),
+            last_render_hash: None,
         }
     }
 }
@@ -36,6 +55,17 @@ impl Renderer for TerminalRenderer {
         // character when rendering.
         if self.saved_position {
             print!("{}", Ansi::RestoreCursorPosition);
+
+            // If the previous batch renders to the same hash as the current
+            // batch, skip rendering the batch.
+            self.hasher.reset();
+            for command in commands {
+                command.hash(&mut self.hasher.0);
+            }
+            let hash = self.hasher.0.finish();
+            if Some(hash) == self.last_render_hash {
+                return Ok(());
+            }
         } else {
             self.saved_position = true;
         }
