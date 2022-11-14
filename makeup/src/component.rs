@@ -30,14 +30,13 @@ pub type Mailbox<C> = Vec<ComponentMessage<C>>;
 
 /// An [`UnboundedSender`] that can be used to send messages to a component
 /// during the [`Component::update_pass`] loop.
-pub type ContextSender<C> = Arc<Mutex<UnboundedSender<(Key, ComponentMessage<C>)>>>;
+pub type ContextTx<M> = Arc<Mutex<UnboundedSender<(Key, M)>>>;
 
 /// The context for a component's update lifecycle.
-// TODO: Figure out the type magic to lift this into a real struct
-pub type UpdateContext<'a, C> = (
-    &'a mut PostOffice<ExtractMessageFromComponent<C>>,
-    ContextSender<C>,
-);
+pub struct UpdateContext<'a, M: std::fmt::Debug + Send + Sync + Clone + 'a> {
+    pub post_office: &'a mut PostOffice<M>,
+    pub tx: ContextTx<RawComponentMessage<M>>,
+}
 
 /// A default message that can be sent to a component.
 #[derive(Debug, Clone)]
@@ -55,7 +54,10 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     /// Process any messages that have been sent to this component. Messages
     /// are expected to be process asynchronously, ie. any long-running
     /// operations should be [`tokio::spawn`]ed as a task.
-    async fn update(&mut self, mailbox: &mut UpdateContext<Self>) -> Result<()>;
+    async fn update(
+        &mut self,
+        mailbox: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+    ) -> Result<()>;
 
     /// Render this component.
     async fn render(&self) -> Result<DrawCommandBatch>;
@@ -63,7 +65,10 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     /// An update pass for this component. Generally, this is implemented by
     /// calling [`Self::update`] and calling `::update` on any child
     /// components.
-    async fn update_pass(&mut self, ctx: &mut UpdateContext<Self>) -> Result<()>;
+    async fn update_pass(
+        &mut self,
+        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+    ) -> Result<()>;
 
     /// A render pass for this component. Generally, this is implemented by
     /// invoking `self.render()` and then calling `render` on each child.

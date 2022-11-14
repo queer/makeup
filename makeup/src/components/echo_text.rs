@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use eyre::Result;
 
-use crate::component::{DrawCommandBatch, Key, UpdateContext};
+use crate::component::{DrawCommandBatch, ExtractMessageFromComponent, Key, UpdateContext};
 use crate::{Component, DrawCommand};
 
 /// A simple component that renders text under the cursor.
@@ -28,7 +28,10 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> EchoText<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Message> {
     type Message = Message;
 
-    async fn update(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
+    async fn update(
+        &mut self,
+        _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -39,7 +42,10 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
         ))
     }
 
-    async fn update_pass(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
+    async fn update_pass(
+        &mut self,
+        _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+    ) -> Result<()> {
         Ok(())
     }
 

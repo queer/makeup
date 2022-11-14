@@ -7,7 +7,7 @@ use eyre::Result;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 
-use crate::component::{DrawCommandBatch, Key};
+use crate::component::{DrawCommandBatch, Key, UpdateContext};
 use crate::post_office::PostOffice;
 use crate::util::RwLocked;
 use crate::{Ansi, Component, DisplayEraseMode, Renderer};
@@ -129,9 +129,13 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         let sender = Arc::new(Mutex::new(tx));
-        (*component)
-            .update_pass(&mut (&mut *post_office, sender))
-            .await?;
+
+        let mut pending_update = UpdateContext {
+            post_office: &mut *post_office,
+            tx: sender.clone(),
+        };
+
+        (*component).update_pass(&mut pending_update).await?;
 
         let lock_clone = post_office_lock.clone();
         tokio::spawn(async move {
@@ -166,7 +170,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
 #[cfg(test)]
 mod tests {
-    use crate::component::{DrawCommandBatch, Key, UpdateContext};
+    use crate::component::{DrawCommandBatch, ExtractMessageFromComponent, Key, UpdateContext};
     use crate::render::MemoryRenderer;
     use crate::{Component, DrawCommand, MUI};
 
@@ -186,8 +190,11 @@ mod tests {
     impl Component for PingableComponent {
         type Message = String;
 
-        async fn update(&mut self, ctx: &mut UpdateContext<Self>) -> Result<()> {
-            if let Some(mailbox) = ctx.0.mailbox(self) {
+        async fn update(
+            &mut self,
+            ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+        ) -> Result<()> {
+            if let Some(mailbox) = ctx.post_office.mailbox(self) {
                 for msg in mailbox.iter() {
                     if let Either::Left(cmd) = msg {
                         if cmd == "ping" {
@@ -215,7 +222,10 @@ mod tests {
             }
         }
 
-        async fn update_pass(&mut self, ctx: &mut UpdateContext<Self>) -> Result<()> {
+        async fn update_pass(
+            &mut self,
+            ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+        ) -> Result<()> {
             self.update(ctx).await
         }
 

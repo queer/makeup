@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use eyre::Result;
 
-use crate::component::{DrawCommandBatch, Key, UpdateContext};
+use crate::component::{DrawCommandBatch, ExtractMessageFromComponent, Key, UpdateContext};
 use crate::{Component, DrawCommand};
 
 /// Simple component that renders text at the given (x, y).
@@ -32,7 +32,10 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PositionedText<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedText<Message> {
     type Message = Message;
 
-    async fn update(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
+    async fn update(
+        &mut self,
+        _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -47,7 +50,10 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedTex
         ))
     }
 
-    async fn update_pass(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
+    async fn update_pass(
+        &mut self,
+        _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+    ) -> Result<()> {
         Ok(())
     }
 

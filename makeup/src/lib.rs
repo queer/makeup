@@ -34,7 +34,7 @@ pub enum DrawCommand {
 
 #[cfg(test)]
 mod tests {
-    use crate::component::{DrawCommandBatch, Key, UpdateContext};
+    use crate::component::{DrawCommandBatch, ExtractMessageFromComponent, Key, UpdateContext};
     use crate::components::EchoText;
     use crate::render::MemoryRenderer;
     use crate::util::RwLocked;
@@ -55,7 +55,10 @@ mod tests {
     impl<'a> Component for BasicComponent<'a> {
         type Message = ();
 
-        async fn update(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
+        async fn update(
+            &mut self,
+            _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+        ) -> Result<()> {
             Ok(())
         }
 
@@ -66,7 +69,10 @@ mod tests {
             ))
         }
 
-        async fn update_pass(&mut self, _ctx: &mut UpdateContext<Self>) -> Result<()> {
+        async fn update_pass(
+            &mut self,
+            _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+        ) -> Result<()> {
             Ok(())
         }
 

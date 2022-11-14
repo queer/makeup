@@ -5,7 +5,9 @@ use async_trait::async_trait;
 use either::Either;
 use eyre::Result;
 
-use crate::component::{DrawCommandBatch, Key, MakeupMessage, UpdateContext};
+use crate::component::{
+    DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, UpdateContext,
+};
 use crate::{Component, DrawCommand};
 
 /// A simple component that renders a spinner with the given text.
@@ -38,16 +40,19 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Spinner<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spinner<Message> {
     type Message = Message;
 
-    async fn update(&mut self, ctx: &mut UpdateContext<Self>) -> Result<()> {
+    async fn update(
+        &mut self,
+        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+    ) -> Result<()> {
         if !self.started {
             self.started = true;
-            let sender = ctx.1.clone();
+            let sender = ctx.tx.clone();
             let sender = sender.lock().await;
             let key = self.key();
             sender.send((key, Either::Right(MakeupMessage::TimerTick(self.interval))))?;
         }
 
-        if let Some(mailbox) = ctx.0.mailbox(self) {
+        if let Some(mailbox) = ctx.post_office.mailbox(self) {
             for msg in mailbox.iter() {
                 match msg {
                     Either::Left(_msg) => {
@@ -57,7 +62,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
                         MakeupMessage::TimerTick(_) => {
                             self.step = (self.step + 1) % self.spin_steps.len();
                             let key = self.key();
-                            let sender = ctx.1.clone();
+                            let sender = ctx.tx.clone();
                             let interval = self.interval;
                             tokio::spawn(async move {
                                 tokio::time::sleep(interval).await;
@@ -91,7 +96,10 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
         ))
     }
 
-    async fn update_pass(&mut self, ctx: &mut UpdateContext<Self>) -> Result<()> {
+    async fn update_pass(
+        &mut self,
+        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+    ) -> Result<()> {
         self.update(ctx).await
     }
 
@@ -110,7 +118,7 @@ mod tests {
     use std::time::Duration;
 
     use super::Spinner;
-    use crate::component::MakeupMessage;
+    use crate::component::{MakeupMessage, UpdateContext};
     use crate::post_office::PostOffice;
     use crate::{Component, DrawCommand};
 
@@ -138,8 +146,12 @@ mod tests {
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
         post_office.send(root.key(), ());
-        root.update_pass(&mut (&mut post_office, sender.clone()))
-            .await?;
+
+        let mut ctx = UpdateContext {
+            post_office: &mut post_office,
+            tx: sender.clone(),
+        };
+        root.update_pass(&mut ctx).await?;
 
         let (_k, render) = root.render().await?;
         assert_eq!(
@@ -154,8 +166,12 @@ mod tests {
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
         post_office.send(root.key(), ());
-        root.update_pass(&mut (&mut post_office, sender.clone()))
-            .await?;
+
+        let mut ctx = UpdateContext {
+            post_office: &mut post_office,
+            tx: sender.clone(),
+        };
+        root.update_pass(&mut ctx).await?;
 
         let (_k, render) = root.render().await?;
         assert_eq!(
@@ -170,8 +186,12 @@ mod tests {
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
         post_office.send(root.key(), ());
-        root.update_pass(&mut (&mut post_office, sender.clone()))
-            .await?;
+
+        let mut ctx = UpdateContext {
+            post_office: &mut post_office,
+            tx: sender.clone(),
+        };
+        root.update_pass(&mut ctx).await?;
 
         let (_k, render) = root.render().await?;
         assert_eq!(
