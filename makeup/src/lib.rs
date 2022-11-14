@@ -33,8 +33,20 @@ pub enum DrawCommand {
 }
 
 #[cfg(test)]
+pub fn fake_render_ctx() -> component::RenderContext {
+    crate::component::RenderContext {
+        last_frame_time: None,
+        frame_counter: 0,
+        fps: 0f64,
+        effective_fps: 0f64,
+    }
+}
+
+#[cfg(test)]
 mod tests {
-    use crate::component::{DrawCommandBatch, ExtractMessageFromComponent, Key, UpdateContext};
+    use crate::component::{
+        DrawCommandBatch, ExtractMessageFromComponent, Key, RenderContext, UpdateContext,
+    };
     use crate::components::EchoText;
     use crate::render::MemoryRenderer;
     use crate::util::RwLocked;
@@ -62,7 +74,7 @@ mod tests {
             Ok(())
         }
 
-        async fn render(&self) -> Result<DrawCommandBatch> {
+        async fn render(&self, _ctx: &RenderContext) -> Result<DrawCommandBatch> {
             Ok((
                 self.key,
                 vec![DrawCommand::TextUnderCursor("henol world".to_string())],
@@ -76,14 +88,14 @@ mod tests {
             Ok(())
         }
 
-        async fn render_pass(&self) -> Result<Vec<DrawCommandBatch>> {
+        async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
             let mut out = vec![];
-            let render = self.render().await?;
+            let render = self.render(ctx).await?;
             out.push(render);
 
             for child in &self.children {
                 let child = child.read().await;
-                let mut render = child.render_pass().await?;
+                let mut render = child.render_pass(ctx).await?;
                 out.append(&mut render);
             }
 
@@ -105,9 +117,9 @@ mod tests {
 
         let mut renderer = MemoryRenderer::new(128, 128);
         let ui = MUI::new(&mut root, &mut renderer);
-        ui.render_frame().await?;
+        ui.render_once().await?;
         let expected = "henol world".to_string();
-        ui.render_frame().await?;
+        ui.render_once().await?;
         renderer.move_cursor(0, 0).await?;
         assert_eq!(expected, renderer.read_at_cursor(expected.len()).await?);
 
@@ -126,7 +138,7 @@ mod tests {
 
         let mut renderer = MemoryRenderer::new(128, 128);
         let ui = MUI::new(&mut root, &mut renderer);
-        ui.render_frame().await?;
+        ui.render_once().await?;
 
         let expected = "henol world? wrong! banana".to_string();
         renderer.move_cursor(0, 0).await?;

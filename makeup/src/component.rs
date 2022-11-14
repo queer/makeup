@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 use crate::{post_office::PostOffice, DrawCommand};
 
 /// A key that uniquely identifies a [`Component`].
-pub type Key = usize;
+pub type Key = u64;
 
 /// A [`Key`]ed batch of [`DrawCommand`]s.
 pub type DrawCommandBatch = (Key, Vec<DrawCommand>);
@@ -33,15 +33,28 @@ pub type Mailbox<C> = Vec<ComponentMessage<C>>;
 pub type ContextTx<M> = Arc<Mutex<UnboundedSender<(Key, M)>>>;
 
 /// The context for a component's update lifecycle.
+#[derive(Debug)]
 pub struct UpdateContext<'a, M: std::fmt::Debug + Send + Sync + Clone + 'a> {
     pub post_office: &'a mut PostOffice<M>,
     pub tx: ContextTx<RawComponentMessage<M>>,
 }
 
-/// A default message that can be sent to a component.
+#[derive(Debug)]
+pub struct RenderContext {
+    pub last_frame_time: Option<Duration>,
+    pub frame_counter: u128,
+    pub fps: f64,
+    pub effective_fps: f64,
+}
+
+/// A default message that can be sent to a component. Contains a lot of the
+/// built-in functionality you would expect:
+/// - Timer ticks
+/// - Text updates
 #[derive(Debug, Clone)]
 pub enum MakeupMessage {
     TimerTick(Duration),
+    TextUpdate(String),
 }
 
 /// A component in a makeup UI. Stateless components can be implemented via
@@ -60,7 +73,7 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     ) -> Result<()>;
 
     /// Render this component.
-    async fn render(&self) -> Result<DrawCommandBatch>;
+    async fn render(&self, ctx: &RenderContext) -> Result<DrawCommandBatch>;
 
     /// An update pass for this component. Generally, this is implemented by
     /// calling [`Self::update`] and calling `::update` on any child
@@ -72,7 +85,7 @@ pub trait Component: std::fmt::Debug + Send + Sync {
 
     /// A render pass for this component. Generally, this is implemented by
     /// invoking `self.render()` and then calling `render` on each child.
-    async fn render_pass(&self) -> Result<Vec<DrawCommandBatch>>;
+    async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>>;
 
     /// A unique key for this component. See [`generate_key`].
     fn key(&self) -> Key;
@@ -80,5 +93,5 @@ pub trait Component: std::fmt::Debug + Send + Sync {
 
 /// Generate a most-likely-unique key for a component.
 pub fn generate_key() -> Key {
-    rand::random::<usize>()
+    rand::random::<Key>()
 }

@@ -7,7 +7,7 @@ use eyre::Result;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 
-use crate::component::{DrawCommandBatch, Key, UpdateContext};
+use crate::component::{DrawCommandBatch, Key, RenderContext, UpdateContext};
 use crate::post_office::PostOffice;
 use crate::util::RwLocked;
 use crate::{Ansi, Component, DisplayEraseMode, Renderer};
@@ -49,13 +49,36 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
             // Clear screen
             print!("{}", Ansi::EraseInDisplay(DisplayEraseMode::All));
         }
-        let frame_target = Duration::from_millis(1000 / 16);
+        let fps_target = 60;
+        let one_second_in_micros = Duration::from_secs(1).as_micros();
+        let frame_target = Duration::from_micros((one_second_in_micros as u64) / fps_target);
+        let mut last_frame_time = None;
+        let mut last_fps: f64 = 0f64;
+        let mut effective_fps: f64 = 0f64;
+        let mut frame_counter = 0u128;
+
         loop {
             let start = Instant::now();
 
-            self.render_frame().await?;
+            let render_context = RenderContext {
+                last_frame_time,
+                frame_counter,
+                fps: last_fps,
+                effective_fps,
+            };
+
+            self.render_frame(&render_context).await?;
+            frame_counter += 1;
 
             let elapsed = start.elapsed();
+            last_frame_time = Some(elapsed);
+            effective_fps = (one_second_in_micros as f64) / (elapsed.as_micros() as f64);
+            last_fps = if effective_fps as u64 > fps_target {
+                fps_target as f64
+            } else {
+                effective_fps
+            };
+
             if let Some(duration) = frame_target.checked_sub(elapsed) {
                 tokio::time::sleep(duration).await
             } else {
@@ -69,12 +92,23 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
         Ok(())
     }
 
+    pub async fn render_once(&'a self) -> Result<()> {
+        let ctx = RenderContext {
+            last_frame_time: None,
+            frame_counter: 0,
+            fps: 0f64,
+            effective_fps: 0f64,
+        };
+
+        self.render_frame(&ctx).await
+    }
+
     /// Apply any pending `Mailbox`es and render the current frame. Makes no
     /// guarantees about hitting a framerate target, but instead renders as
     /// fast as possible.
-    pub async fn render_frame(&'a self) -> Result<()> {
+    async fn render_frame(&'a self, ctx: &RenderContext) -> Result<()> {
         let ui = self.ui.lock().await;
-        let commands = ui.render().await?;
+        let commands = ui.render(ctx).await?;
 
         let mut renderer = self.renderer.write().await;
         renderer.render(&commands).await?;
@@ -111,10 +145,10 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
     /// Render the entire UI.
     // TODO: Graceful error handling...
-    pub async fn render(&self) -> Result<Vec<DrawCommandBatch>> {
+    pub async fn render(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
         Self::update_recursive(&self.root, self.post_office.clone()).await?;
         let root = &self.root.read().await;
-        let draw_commands = root.render_pass().await?;
+        let draw_commands = root.render_pass(ctx).await?;
         Ok(draw_commands)
     }
 
@@ -156,13 +190,13 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
     }
 
     #[allow(unused)]
-    pub async fn send(&self, key: usize, message: M) {
+    pub async fn send(&self, key: Key, message: M) {
         let mut post_office = self.post_office.lock().await;
         post_office.send(key, message);
     }
 
     #[allow(unused)]
-    pub async fn send_makeup(&self, key: usize, message: M) {
+    pub async fn send_makeup(&self, key: Key, message: M) {
         let mut post_office = self.post_office.lock().await;
         post_office.send(key, message);
     }
@@ -170,7 +204,9 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
 #[cfg(test)]
 mod tests {
-    use crate::component::{DrawCommandBatch, ExtractMessageFromComponent, Key, UpdateContext};
+    use crate::component::{
+        DrawCommandBatch, ExtractMessageFromComponent, Key, RenderContext, UpdateContext,
+    };
     use crate::render::MemoryRenderer;
     use crate::{Component, DrawCommand, MUI};
 
@@ -208,7 +244,7 @@ mod tests {
             Ok(())
         }
 
-        async fn render(&self) -> Result<DrawCommandBatch> {
+        async fn render(&self, _ctx: &RenderContext) -> Result<DrawCommandBatch> {
             if !self.was_pinged {
                 Ok((
                     self.key,
@@ -229,8 +265,8 @@ mod tests {
             self.update(ctx).await
         }
 
-        async fn render_pass(&self) -> Result<Vec<DrawCommandBatch>> {
-            Ok(vec![self.render().await?])
+        async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
+            Ok(vec![self.render(ctx).await?])
         }
 
         fn key(&self) -> Key {
@@ -249,7 +285,7 @@ mod tests {
 
         let mut renderer = MemoryRenderer::new(128, 128);
         let ui = MUI::new(&mut root, &mut renderer);
-        ui.render_frame().await?;
+        ui.render_frame(&crate::fake_render_ctx()).await?;
 
         {
             let mut renderer = ui.renderer().write().await;
@@ -258,7 +294,7 @@ mod tests {
         }
 
         ui.send(key, "ping".to_string()).await;
-        ui.render_frame().await?;
+        ui.render_frame(&crate::fake_render_ctx()).await?;
 
         {
             let mut renderer = ui.renderer().write().await;

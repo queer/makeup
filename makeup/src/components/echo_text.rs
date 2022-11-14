@@ -1,9 +1,12 @@
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
+use either::Either;
 use eyre::Result;
 
-use crate::component::{DrawCommandBatch, ExtractMessageFromComponent, Key, UpdateContext};
+use crate::component::{
+    DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
+};
 use crate::{Component, DrawCommand};
 
 /// A simple component that renders text under the cursor.
@@ -30,12 +33,30 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
 
     async fn update(
         &mut self,
-        _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
     ) -> Result<()> {
+        if let Some(mailbox) = ctx.post_office.mailbox(self) {
+            for msg in mailbox.iter() {
+                match msg {
+                    Either::Left(_msg) => {
+                        // log::debug!("Spinner received message: {:?}", msg);
+                    }
+                    #[allow(clippy::single_match)]
+                    Either::Right(msg) => match msg {
+                        MakeupMessage::TextUpdate(text) => {
+                            self.text = text.clone();
+                        }
+                        _ => {}
+                    },
+                }
+            }
+            mailbox.clear();
+        }
+
         Ok(())
     }
 
-    async fn render(&self) -> Result<DrawCommandBatch> {
+    async fn render(&self, _ctx: &RenderContext) -> Result<DrawCommandBatch> {
         Ok((
             self.key,
             vec![DrawCommand::TextUnderCursor(self.text.clone())],
@@ -49,8 +70,8 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
         Ok(())
     }
 
-    async fn render_pass(&self) -> Result<Vec<DrawCommandBatch>> {
-        Ok(vec![self.render().await?])
+    async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
+        Ok(vec![self.render(ctx).await?])
     }
 
     fn key(&self) -> Key {
@@ -69,7 +90,7 @@ mod tests {
     async fn test_it_works() -> Result<()> {
         let root = EchoText::<()>::new("henol world");
 
-        let (_k, render) = root.render().await?;
+        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
             vec![DrawCommand::TextUnderCursor("henol world".to_string(),)].as_slice(),
             render.as_slice(),

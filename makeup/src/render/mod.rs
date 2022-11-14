@@ -53,7 +53,7 @@ mod tests {
 
         let mut renderer = MemoryRenderer::new(128, 128);
         let ui = MUI::<()>::new(&mut root, &mut renderer);
-        ui.render_frame().await?;
+        ui.render_once().await?;
 
         renderer.move_cursor(0, 0).await?;
         assert_eq!(

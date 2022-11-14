@@ -6,7 +6,7 @@ use either::Either;
 use eyre::Result;
 
 use crate::component::{
-    DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, UpdateContext,
+    DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
 };
 use crate::{Component, DrawCommand};
 
@@ -58,6 +58,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
                     Either::Left(_msg) => {
                         // log::debug!("Spinner received message: {:?}", msg);
                     }
+                    #[allow(clippy::single_match)]
                     Either::Right(msg) => match msg {
                         MakeupMessage::TimerTick(_) => {
                             self.step = (self.step + 1) % self.spin_steps.len();
@@ -77,6 +78,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
                                 }
                             });
                         }
+                        _ => {}
                     },
                 }
             }
@@ -85,7 +87,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
         Ok(())
     }
 
-    async fn render(&self) -> Result<DrawCommandBatch> {
+    async fn render(&self, _ctx: &RenderContext) -> Result<DrawCommandBatch> {
         Ok((
             self.key,
             vec![
@@ -103,8 +105,8 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
         self.update(ctx).await
     }
 
-    async fn render_pass(&self) -> Result<Vec<DrawCommandBatch>> {
-        Ok(vec![self.render().await?])
+    async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
+        Ok(vec![self.render(ctx).await?])
     }
 
     fn key(&self) -> Key {
@@ -133,7 +135,7 @@ mod tests {
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
         let sender = Arc::new(Mutex::new(tx));
 
-        let (_k, render) = root.render().await?;
+        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
             vec![
                 DrawCommand::TextUnderCursor("-".into()),
@@ -153,7 +155,7 @@ mod tests {
         };
         root.update_pass(&mut ctx).await?;
 
-        let (_k, render) = root.render().await?;
+        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
             vec![
                 DrawCommand::TextUnderCursor("\\".into()),
@@ -173,7 +175,7 @@ mod tests {
         };
         root.update_pass(&mut ctx).await?;
 
-        let (_k, render) = root.render().await?;
+        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
             vec![
                 DrawCommand::TextUnderCursor("|".into()),
@@ -193,7 +195,7 @@ mod tests {
         };
         root.update_pass(&mut ctx).await?;
 
-        let (_k, render) = root.render().await?;
+        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
             vec![
                 DrawCommand::TextUnderCursor("/".into()),
