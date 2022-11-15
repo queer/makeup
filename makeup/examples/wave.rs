@@ -96,8 +96,7 @@ impl Component for Wave {
     async fn render(&self, ctx: &RenderContext) -> Result<DrawCommandBatch> {
         let mut commands = vec![];
 
-        let terminal_step = ctx.dimensions.1 / 10;
-        let mut colours = self.gradient.colors(terminal_step as usize * 10);
+        let mut colours = self.gradient.colors(ctx.dimensions.1 as usize - 1);
         let len = &colours.len();
         colours.rotate_right(self.step as usize * (len / 10));
 
