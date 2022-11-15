@@ -65,9 +65,9 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
 
     async fn update_pass(
         &mut self,
-        _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
     ) -> Result<()> {
-        Ok(())
+        self.update(ctx).await
     }
 
     async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {

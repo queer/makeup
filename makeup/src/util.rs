@@ -32,7 +32,7 @@ impl<T> RwLocked<T> {
     }
 }
 
-/// Downcsat any type into [`Any`].
+/// Downcsat any type into [`std::any::Any`].
 pub trait AsAny {
     fn as_any(&self) -> &dyn std::any::Any;
 

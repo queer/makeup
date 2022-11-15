@@ -7,7 +7,7 @@ pub mod prelude {
 }
 
 /// Convert a string literal to an ANSI escape sequence.
-/// See: https://github.com/crossterm-rs/crossterm/blob/7e1279edc57a668e98211043710022b2bfa4b3a8/src/macros.rs#L1-L6
+/// See: <https://github.com/crossterm-rs/crossterm/blob/7e1279edc57a668e98211043710022b2bfa4b3a8/src/macros.rs#L1-L6>
 #[macro_export]
 macro_rules! ansi {
     ($( $l:expr ),*) => { concat!("\x1B[", $( $l ),*) };
@@ -66,7 +66,7 @@ pub enum Ansi {
     TerminalBackgroundColour(Colour),
     /// Set attributes on the current terminal.
     /// This is not supported on Windows.
-    /// See: https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters
+    /// See: <https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters>
     Sgr(Vec<SgrParameter>),
 }
 
@@ -450,7 +450,7 @@ pub enum LineEraseMode {
     All,
 }
 
-/// See: https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters
+/// See: <https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters>
 pub enum SgrParameter {
     /// Reset all attributes.
     Reset,
@@ -493,7 +493,7 @@ pub enum SgrParameter {
     Fraktur,
 
     /// Double underline. Note: On some systems, this may instead disable
-    /// [`Bold`].
+    /// `Bold`.
     DoubleUnderline,
 
     /// Normal intensity.
@@ -514,11 +514,11 @@ pub enum SgrParameter {
     ProportionalSpacing,
 
     /// Not reversed.
-    /// Presumably undoes [`ReverseVideo`], needs testing.
+    /// Presumably undoes `ReverseVideo`, needs testing.
     NotReversed,
 
     /// Reveal concealed text.
-    /// Presumably undoes [`Conceal`], needs testing.
+    /// Presumably undoes `Conceal`, needs testing.
     Reveal,
 
     /// Not crossed out.
@@ -553,7 +553,7 @@ pub enum SgrParameter {
 
     /// Set the overlined attribute.
     /// Note: Not supported in Terminal.app.
-    /// Note: On some systems, this may instead enable [`Bold`].
+    /// Note: On some systems, this may instead enable `Bold`.
     Overlined,
 
     /// Not framed or encircled.
@@ -591,11 +591,11 @@ pub enum SgrParameter {
 
     /// Ideogram attributes off.
     /// Resets:
-    /// - [`IdeogramUnderlineOrRightSideLine`]
-    /// - [`IdeogramDoubleUnderlineOrDoubleLineOnTheRightSide`]
-    /// - [`IdeogramOverlineOrLeftSideLine`]
-    /// - [`IdeogramDoubleOverlineOrDoubleLineOnTheLeftSide`]
-    /// - [`IdeogramStressMarking`].
+    /// - `IdeogramUnderlineOrRightSideLine`
+    /// - `IdeogramDoubleUnderlineOrDoubleLineOnTheRightSide`
+    /// - `IdeogramOverlineOrLeftSideLine`
+    /// - `IdeogramDoubleOverlineOrDoubleLineOnTheLeftSide`
+    /// - `IdeogramStressMarking`.
     IdeogramAttributesOff,
 
     /// Implemented only in mintty.

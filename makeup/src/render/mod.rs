@@ -9,6 +9,7 @@ pub mod memory;
 pub mod terminal;
 
 pub use memory::MemoryRenderer;
+pub use terminal::TerminalRenderer;
 
 /// A `Renderer` takes in a slice of [`DrawCommandBatch`]es and renders them
 /// somehow. No constraints are placed on rendering, ie a renderer can use any

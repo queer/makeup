@@ -15,7 +15,7 @@ use crate::post_office::PostOffice;
 use crate::util::RwLocked;
 use crate::{Ansi, Component, DisplayEraseMode, Renderer};
 
-/// A makeup UI. Generally used with [`TerminalRenderer`].
+/// A makeup UI. Generally used with [`crate::render::TerminalRenderer`].
 ///
 /// MUIs are supposed to be entirely async. Components are updated and rendered
 /// async; any blocking component tasks are expected to be moved onto the async
