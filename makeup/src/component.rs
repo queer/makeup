@@ -73,7 +73,7 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     /// operations should be [`tokio::spawn`]ed as a task.
     async fn update(
         &mut self,
-        mailbox: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
+        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
     ) -> Result<()>;
 
     /// Render this component.

@@ -32,13 +32,19 @@ impl Renderer for MemoryRenderer {
                             self.text
                                 .insert((self.cursor_x + (i as Dimension), self.cursor_y), c);
                         }
+                        // TODO: Newline detection
                         self.cursor_x += text_len;
                     }
                     DrawCommand::CharUnderCursor(c) => {
                         self.bounds_check(self.cursor_x, self.cursor_y)?;
                         self.bounds_check(self.cursor_x + 1, self.cursor_y)?;
                         self.text.insert((self.cursor_x, self.cursor_y), *c);
-                        self.cursor_x += 1;
+                        if *c == '\n' {
+                            self.cursor_x = 0;
+                            self.cursor_y += 1;
+                        } else {
+                            self.cursor_x += 1;
+                        }
                     }
                     DrawCommand::EraseCurrentLine(mode) => match mode {
                         LineEraseMode::FromCursorToStart => {
