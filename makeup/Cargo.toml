@@ -25,6 +25,8 @@ colorgrad = "0.6.2"
 
 [dependencies.makeup-ansi]
 path = "../makeup-ansi"
+version = "0.0.1"
 
 [dependencies.makeup-console]
 path = "../makeup-console"
+version = "0.0.1"
