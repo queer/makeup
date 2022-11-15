@@ -58,13 +58,6 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
             // Clear screen
             print!("{}", Ansi::EraseInDisplay(DisplayEraseMode::All));
         }
-        let fps_target = 60;
-        let one_second_in_micros = Duration::from_secs(1).as_micros();
-        let frame_target = Duration::from_micros((one_second_in_micros as u64) / fps_target);
-        let mut last_frame_time = None;
-        let mut last_fps: f64 = 0f64;
-        let mut effective_fps: f64 = 0f64;
-        let mut frame_counter = 0u128;
 
         let input_tx_lock = self.input_tx.clone();
         tokio::spawn(async move {
@@ -72,7 +65,6 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
                 let tx = input_tx_lock.lock().await;
                 match makeup_console::next_keypress().await {
                     Ok(key) => {
-                        dbg!(&key);
                         tx.send(InputFrame::Frame(key)).unwrap();
                     }
                     Err(e) => {
@@ -97,9 +89,15 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
             }
         });
 
-        let mut start = Instant::now();
-
+        let fps_target = 60;
+        let one_second_in_micros = Duration::from_secs(1).as_micros();
+        let frame_target = Duration::from_micros((one_second_in_micros as u64) / fps_target);
+        let mut last_frame_time = None;
+        let mut last_fps: f64 = 0f64;
+        let mut effective_fps: f64 = 0f64;
+        let mut frame_counter = 0u128;
         'render_loop: loop {
+            let start = Instant::now();
             let render_context = RenderContext {
                 last_frame_time,
                 frame_counter,
@@ -143,7 +141,6 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
             } else {
                 effective_fps
             };
-            start = Instant::now();
 
             // TODO: This fucks input doesn't it?
             if let Some(duration) = frame_target.checked_sub(elapsed) {
@@ -203,16 +200,16 @@ enum InputFrame {
 
 #[derive(Debug)]
 struct UI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
-    root: RwLocked<&'a mut dyn Component<Message = M>>,
-    post_office: Arc<Mutex<PostOffice<M>>>,
+    root: Mutex<&'a mut dyn Component<Message = M>>,
+    post_office: Arc<RwLocked<PostOffice<M>>>,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
     /// Build a new `UI` from the given root component.
     pub fn new(root: &'a mut dyn Component<Message = M>) -> Self {
         Self {
-            root: RwLocked::new(root),
-            post_office: Arc::new(Mutex::new(PostOffice::new())),
+            root: Mutex::new(root),
+            post_office: Arc::new(RwLocked::new(PostOffice::new())),
         }
     }
 
@@ -223,26 +220,19 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         pending_input: &[Keypress],
         ctx: &RenderContext,
     ) -> Result<Vec<DrawCommandBatch>> {
-        {
-            let root = &self.root.read().await;
-            Self::mail_pending_input(pending_input, self.post_office.clone(), root.key()).await;
-        }
-
-        Self::update_recursive(&self.root, self.post_office.clone()).await?;
-
-        {
-            let root = &self.root.read().await;
-            let draw_commands = root.render_pass(ctx).await?;
-            Ok(draw_commands)
-        }
+        let mut post_office = self.post_office.write().await;
+        let mut root = self.root.lock().await;
+        Self::mail_pending_input(pending_input, &mut post_office, root.key());
+        Self::update_recursive(*root, &mut post_office, self.post_office.clone()).await?;
+        let draw_commands = root.render_pass(ctx).await?;
+        Ok(draw_commands)
     }
 
-    async fn mail_pending_input(
+    fn mail_pending_input(
         pending_input: &[Keypress],
-        post_office_lock: Arc<Mutex<PostOffice<M>>>,
+        post_office: &mut PostOffice<M>,
         focused_component: Key,
     ) {
-        let mut post_office = post_office_lock.lock().await;
         for keypress in pending_input {
             post_office.send_makeup(focused_component, MakeupMessage::Keypress(keypress.clone()));
         }
@@ -250,13 +240,10 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
     #[async_recursion]
     async fn update_recursive(
-        component: &RwLocked<&mut dyn Component<Message = M>>,
-        post_office_lock: Arc<Mutex<PostOffice<M>>>,
+        component: &mut dyn Component<Message = M>,
+        post_office: &mut PostOffice<M>,
+        post_office_lock: Arc<RwLocked<PostOffice<M>>>,
     ) -> Result<()> {
-        let post_office_lock = post_office_lock.clone();
-        let mut post_office = post_office_lock.lock().await;
-        let mut component = component.write().await;
-
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         let sender = Arc::new(Mutex::new(tx));
 
@@ -270,7 +257,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         let lock_clone = post_office_lock.clone();
         tokio::spawn(async move {
             while let Some((id, message)) = rx.recv().await {
-                let mut post_office = lock_clone.lock().await;
+                let mut post_office = lock_clone.write().await;
                 match message {
                     Either::Left(left) => {
                         post_office.send(id, left);
@@ -287,13 +274,13 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
     #[allow(unused)]
     pub async fn send(&self, key: Key, message: M) {
-        let mut post_office = self.post_office.lock().await;
+        let mut post_office = self.post_office.write().await;
         post_office.send(key, message);
     }
 
     #[allow(unused)]
     pub async fn send_makeup(&self, key: Key, message: MakeupMessage) {
-        let mut post_office = self.post_office.lock().await;
+        let mut post_office = self.post_office.write().await;
         post_office.send_makeup(key, message);
     }
 }

@@ -21,6 +21,10 @@ pub enum DrawCommand {
     /// characters.
     TextUnderCursor(String),
 
+    /// Draw a single character under the cursor, advancing the cursor by 1
+    /// character.
+    CharUnderCursor(char),
+
     /// Draw text at the given (x, y), moving the cursor to
     /// `(x + text.len(), y)`.
     TextAt { x: usize, y: usize, text: String },

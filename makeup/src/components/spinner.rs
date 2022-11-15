@@ -68,14 +68,9 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
                             tokio::spawn(async move {
                                 tokio::time::sleep(interval).await;
                                 let sender = sender.lock().await;
-                                match sender
+                                sender
                                     .send((key, Either::Right(MakeupMessage::TimerTick(interval))))
-                                {
-                                    Ok(_) => {}
-                                    Err(err) => {
-                                        dbg!(&err);
-                                    }
-                                }
+                                    .unwrap();
                             });
                         }
                         _ => {}
@@ -91,8 +86,8 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
         Ok((
             self.key,
             vec![
-                DrawCommand::TextUnderCursor(self.spin_steps[self.step].to_string()),
-                DrawCommand::TextUnderCursor(" ".to_string()),
+                DrawCommand::CharUnderCursor(self.spin_steps[self.step]),
+                DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor(self.text.clone()),
             ],
         ))
@@ -138,8 +133,8 @@ mod tests {
         let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
             vec![
-                DrawCommand::TextUnderCursor("-".into()),
-                DrawCommand::TextUnderCursor(" ".into()),
+                DrawCommand::CharUnderCursor('-'),
+                DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ]
             .as_slice(),
@@ -158,8 +153,8 @@ mod tests {
         let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
             vec![
-                DrawCommand::TextUnderCursor("\\".into()),
-                DrawCommand::TextUnderCursor(" ".into()),
+                DrawCommand::CharUnderCursor('\\'),
+                DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ]
             .as_slice(),
@@ -178,8 +173,8 @@ mod tests {
         let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
             vec![
-                DrawCommand::TextUnderCursor("|".into()),
-                DrawCommand::TextUnderCursor(" ".into()),
+                DrawCommand::CharUnderCursor('|'),
+                DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ]
             .as_slice(),
@@ -198,8 +193,8 @@ mod tests {
         let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
             vec![
-                DrawCommand::TextUnderCursor("/".into()),
-                DrawCommand::TextUnderCursor(" ".into()),
+                DrawCommand::CharUnderCursor('/'),
+                DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ]
             .as_slice(),

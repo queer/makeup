@@ -29,6 +29,12 @@ impl Renderer for MemoryRenderer {
                         }
                         self.cursor_x += text.len();
                     }
+                    DrawCommand::CharUnderCursor(c) => {
+                        self.bounds_check(self.cursor_x, self.cursor_y)?;
+                        self.bounds_check(self.cursor_x + 1, self.cursor_y)?;
+                        self.text.insert((self.cursor_x, self.cursor_y), *c);
+                        self.cursor_x += 1;
+                    }
                     DrawCommand::TextAt { x, y, text } => {
                         self.bounds_check(*x, *y)?;
                         self.bounds_check(*x + text.len(), *y)?;

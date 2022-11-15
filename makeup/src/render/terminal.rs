@@ -78,6 +78,9 @@ impl Renderer for TerminalRenderer {
                     DrawCommand::TextUnderCursor(text) => {
                         print!("{}", text);
                     }
+                    DrawCommand::CharUnderCursor(c) => {
+                        print!("{}", c);
+                    }
                     DrawCommand::TextAt { x, y, text } => {
                         print!("{}{}", Ansi::CursorPosition(*x, *y), text);
                     }
