@@ -4,16 +4,17 @@ use makeup_ansi::LineEraseMode;
 
 use super::RenderError;
 use crate::component::DrawCommandBatch;
+use crate::{Coordinate, Coordinates, Dimension, RelativeCoordinate};
 use crate::{DrawCommand, Renderer};
 
 /// A [`Renderer`] that renders to an in-memory grid.
 #[derive(Debug)]
 pub struct MemoryRenderer {
-    cursor_x: usize,
-    cursor_y: usize,
-    width: usize,
-    height: usize,
-    text: std::collections::HashMap<(usize, usize), char>,
+    cursor_x: Coordinate,
+    cursor_y: Coordinate,
+    width: Dimension,
+    height: Dimension,
+    text: std::collections::HashMap<Coordinates, char>,
 }
 
 #[async_trait]
@@ -24,12 +25,14 @@ impl Renderer for MemoryRenderer {
             for command in commands {
                 match command {
                     DrawCommand::TextUnderCursor(text) => {
+                        let text_len = text.len() as Dimension;
                         self.bounds_check(self.cursor_x, self.cursor_y)?;
-                        self.bounds_check(self.cursor_x + text.len(), self.cursor_y)?;
+                        self.bounds_check(self.cursor_x + text_len, self.cursor_y)?;
                         for (i, c) in text.chars().enumerate() {
-                            self.text.insert((self.cursor_x + i, self.cursor_y), c);
+                            self.text
+                                .insert((self.cursor_x + (i as Dimension), self.cursor_y), c);
                         }
-                        self.cursor_x += text.len();
+                        self.cursor_x += text_len;
                     }
                     DrawCommand::CharUnderCursor(c) => {
                         self.bounds_check(self.cursor_x, self.cursor_y)?;
@@ -55,21 +58,22 @@ impl Renderer for MemoryRenderer {
                         }
                     },
                     DrawCommand::TextAt { x, y, text } => {
+                        let text_len = text.len() as Dimension;
                         self.bounds_check(*x, *y)?;
-                        self.bounds_check(*x + text.len(), *y)?;
+                        self.bounds_check(*x + text_len, *y)?;
                         for (i, c) in text.chars().enumerate() {
-                            self.text.insert((x + i, *y), c);
+                            self.text.insert((x + (i as Dimension), *y), c);
                         }
-                        self.cursor_x = x + text.len();
+                        self.cursor_x = x + text_len;
                         self.cursor_y = *y;
                     }
                     DrawCommand::MoveCursorRelative { x, y } => {
-                        let cursor_x = self.cursor_x as isize;
-                        let cursor_y = self.cursor_y as isize;
+                        let cursor_x = self.cursor_x as RelativeCoordinate;
+                        let cursor_y = self.cursor_y as RelativeCoordinate;
 
                         self.bounds_check_relative(cursor_x + x, cursor_y + y)?;
-                        self.cursor_x = (cursor_x + *x) as usize;
-                        self.cursor_y = (cursor_y + *y) as usize;
+                        self.cursor_x = (cursor_x + x) as Coordinate;
+                        self.cursor_y = (cursor_y + y) as Coordinate;
                     }
                     DrawCommand::MoveCursorAbsolute { x, y } => {
                         self.bounds_check(*x, *y)?;
@@ -82,28 +86,32 @@ impl Renderer for MemoryRenderer {
         Ok(())
     }
 
-    async fn move_cursor(&mut self, x: usize, y: usize) -> Result<()> {
+    async fn move_cursor(&mut self, x: Coordinate, y: Coordinate) -> Result<()> {
         self.bounds_check(x, y)?;
         self.cursor_x = x;
         self.cursor_y = y;
         Ok(())
     }
 
-    async fn move_cursor_relative(&mut self, x: isize, y: isize) -> Result<()> {
-        let cursor_x = self.cursor_x as isize;
-        let cursor_y = self.cursor_y as isize;
+    async fn move_cursor_relative(
+        &mut self,
+        x: RelativeCoordinate,
+        y: RelativeCoordinate,
+    ) -> Result<()> {
+        let cursor_x = self.cursor_x as RelativeCoordinate;
+        let cursor_y = self.cursor_y as RelativeCoordinate;
 
         self.bounds_check_relative(cursor_x + x, cursor_y + y)?;
-        self.cursor_x = (cursor_x + x) as usize;
-        self.cursor_y = (cursor_y + y) as usize;
+        self.cursor_x = (cursor_x + x) as Coordinate;
+        self.cursor_y = (cursor_y + y) as Coordinate;
         Ok(())
     }
 
-    async fn read_at_cursor(&self, width: usize) -> Result<String> {
+    async fn read_at_cursor(&self, width: Dimension) -> Result<String> {
         self.read_string(self.cursor_x, self.cursor_y, width).await
     }
 
-    async fn read_string(&self, x: usize, y: usize, width: usize) -> Result<String> {
+    async fn read_string(&self, x: Coordinate, y: Coordinate, width: Dimension) -> Result<String> {
         self.bounds_check(x, y)?;
         self.bounds_check(x + width, y)?;
         let mut result = String::new();
@@ -113,13 +121,13 @@ impl Renderer for MemoryRenderer {
         Ok(result)
     }
 
-    fn cursor(&self) -> (usize, usize) {
+    fn cursor(&self) -> Coordinates {
         (self.cursor_x, self.cursor_y)
     }
 }
 
 impl MemoryRenderer {
-    pub fn new(width: usize, height: usize) -> MemoryRenderer {
+    pub fn new(width: Dimension, height: Dimension) -> MemoryRenderer {
         MemoryRenderer {
             cursor_x: 0,
             cursor_y: 0,
@@ -130,16 +138,20 @@ impl MemoryRenderer {
     }
 
     // TODO: Should we just be truncating instead?
-    fn bounds_check(&self, x: usize, y: usize) -> Result<()> {
+    fn bounds_check(&self, x: Coordinate, y: Coordinate) -> Result<()> {
         if x < self.width && y < self.height {
             Ok(())
         } else {
-            Err(RenderError::OutOfBounds(x as isize, y as isize).into())
+            Err(RenderError::OutOfBounds(x as RelativeCoordinate, y as RelativeCoordinate).into())
         }
     }
 
-    fn bounds_check_relative(&self, x: isize, y: isize) -> Result<()> {
-        if x < self.width as isize && y < self.height as isize && x >= 0 && y >= 0 {
+    fn bounds_check_relative(&self, x: RelativeCoordinate, y: RelativeCoordinate) -> Result<()> {
+        if x < self.width as RelativeCoordinate
+            && y < self.height as RelativeCoordinate
+            && x >= 0
+            && y >= 0
+        {
             Ok(())
         } else {
             Err(RenderError::OutOfBounds(x, y).into())

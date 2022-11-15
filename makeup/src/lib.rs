@@ -1,5 +1,4 @@
 #![deny(unsafe_code)]
-
 pub mod component;
 pub mod components;
 pub mod post_office;
@@ -12,6 +11,11 @@ pub use render::Renderer;
 pub use ui::MUI;
 
 pub use makeup_ansi::prelude::*;
+
+pub type Dimension = u64;
+pub type Coordinate = u64;
+pub type RelativeCoordinate = i64;
+pub type Coordinates = (Coordinate, Coordinate);
 
 /// Commands for drawing to the character grid. Draw commands are processed by
 /// the current [`Renderer`].
@@ -31,13 +35,20 @@ pub enum DrawCommand {
 
     /// Draw text at the given (x, y), moving the cursor to
     /// `(x + text.len(), y)`.
-    TextAt { x: usize, y: usize, text: String },
+    TextAt {
+        x: Coordinate,
+        y: Coordinate,
+        text: String,
+    },
 
     /// Move the cursor relative to its current position.
-    MoveCursorRelative { x: isize, y: isize },
+    MoveCursorRelative {
+        x: RelativeCoordinate,
+        y: RelativeCoordinate,
+    },
 
     /// Move the cursor absolutely.
-    MoveCursorAbsolute { x: usize, y: usize },
+    MoveCursorAbsolute { x: Coordinate, y: Coordinate },
 }
 
 #[cfg(test)]
@@ -129,7 +140,10 @@ mod tests {
         let expected = "henol world".to_string();
         ui.render_once().await?;
         renderer.move_cursor(0, 0).await?;
-        assert_eq!(expected, renderer.read_at_cursor(expected.len()).await?);
+        assert_eq!(
+            expected,
+            renderer.read_at_cursor(expected.len() as u64).await?
+        );
 
         Ok(())
     }
@@ -150,7 +164,10 @@ mod tests {
 
         let expected = "henol world? wrong! banana".to_string();
         renderer.move_cursor(0, 0).await?;
-        assert_eq!(expected, renderer.read_at_cursor(expected.len()).await?);
+        assert_eq!(
+            expected,
+            renderer.read_at_cursor(expected.len() as u64).await?
+        );
 
         Ok(())
     }

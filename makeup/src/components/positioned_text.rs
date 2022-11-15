@@ -7,20 +7,20 @@ use eyre::Result;
 use crate::component::{
     DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
 };
-use crate::{Component, DrawCommand};
+use crate::{Component, Coordinate, DrawCommand};
 
 /// Simple component that renders text at the given (x, y).
 #[derive(Debug)]
 pub struct PositionedText<Message: std::fmt::Debug + Send + Sync + Clone> {
     text: String,
-    x: usize,
-    y: usize,
+    x: Coordinate,
+    y: Coordinate,
     key: Key,
     _phantom: PhantomData<Message>,
 }
 
 impl<Message: std::fmt::Debug + Send + Sync + Clone> PositionedText<Message> {
-    pub fn new<S: Into<String>>(text: S, x: usize, y: usize) -> Self {
+    pub fn new<S: Into<String>>(text: S, x: Coordinate, y: Coordinate) -> Self {
         Self {
             text: text.into(),
             x,

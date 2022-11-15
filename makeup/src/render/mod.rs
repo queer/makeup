@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use crate::component::DrawCommandBatch;
 use crate::util::AsAny;
+use crate::{Coordinate, Coordinates, Dimension, RelativeCoordinate};
 
 pub mod memory;
 pub mod terminal;
@@ -22,22 +23,26 @@ pub use terminal::TerminalRenderer;
 pub trait Renderer: std::fmt::Debug + AsAny {
     async fn render(&mut self, commands: &[DrawCommandBatch]) -> Result<()>;
 
-    async fn move_cursor(&mut self, x: usize, y: usize) -> Result<()>;
+    async fn move_cursor(&mut self, x: Coordinate, y: Coordinate) -> Result<()>;
 
-    async fn move_cursor_relative(&mut self, x: isize, y: isize) -> Result<()>;
+    async fn move_cursor_relative(
+        &mut self,
+        x: RelativeCoordinate,
+        y: RelativeCoordinate,
+    ) -> Result<()>;
 
-    async fn read_at_cursor(&self, width: usize) -> Result<String>;
+    async fn read_at_cursor(&self, width: Dimension) -> Result<String>;
 
-    async fn read_string(&self, x: usize, y: usize, width: usize) -> Result<String>;
+    async fn read_string(&self, x: Coordinate, y: Coordinate, width: Dimension) -> Result<String>;
 
-    fn cursor(&self) -> (usize, usize);
+    fn cursor(&self) -> Coordinates;
 }
 
 /// An error that occurred during rendering.
 #[derive(Debug, Error)]
 pub enum RenderError {
     #[error("Coordinates ({0}, {1}) out of bounds!")]
-    OutOfBounds(isize, isize),
+    OutOfBounds(RelativeCoordinate, RelativeCoordinate),
 }
 
 #[cfg(test)]

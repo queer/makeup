@@ -18,25 +18,25 @@ macro_rules! ansi {
 pub enum Ansi {
     // Cursor manipulation
     /// Set the (x, y) cursor position.
-    CursorPosition(usize, usize),
+    CursorPosition(u64, u64),
     /// Set the cursor style.
     CursorStyle(CursorStyle),
     /// Set the cursor visibility.
     CursorVisibility(CursorVisibility),
     /// Move the cursor up.
-    CursorUp(usize),
+    CursorUp(u64),
     /// Move the cursor down.
-    CursorDown(usize),
+    CursorDown(u64),
     /// Move the cursor left.
-    CursorLeft(usize),
+    CursorLeft(u64),
     /// Move the cursor right.
-    CursorRight(usize),
+    CursorRight(u64),
     /// Move the cursor to the start of line `count` steps down.
-    CursorNextLine(usize),
+    CursorNextLine(u64),
     /// Move the cursor to the start of line `count` steps up.
-    CursorPreviousLine(usize),
+    CursorPreviousLine(u64),
     /// Move the cursor to the column `x`.
-    CursorHorizontalAbsolute(usize),
+    CursorHorizontalAbsolute(u64),
     /// Save the current position of the cursor.
     SaveCursorPosition,
     /// Restore the position of the cursor.
@@ -48,14 +48,14 @@ pub enum Ansi {
     /// Erase part of the current line.
     EraseInLine(LineEraseMode),
     /// Scroll the display up.
-    ScrollUp(usize),
+    ScrollUp(u64),
     /// Scroll the display down.
-    ScrollDown(usize),
+    ScrollDown(u64),
 
     // Terminal manipulation
     /// Set the terminal size.
     /// This is not supported on Windows.
-    TerminalSize(usize, usize),
+    TerminalSize(u64, u64),
     /// Set the terminal title.
     /// This is not supported on Windows.
     TerminalTitle(String),
@@ -421,8 +421,8 @@ pub enum Colour {
 
 impl Colour {
     /// Index in the enum.
-    pub fn index(&self) -> usize {
-        *self as usize
+    pub fn index(&self) -> u64 {
+        *self as u64
     }
 }
 
@@ -493,7 +493,7 @@ pub enum SgrParameter {
     PrimaryFont,
 
     /// Select the alternative font at the given index (N-10).
-    AlternativeFont(usize),
+    AlternativeFont(u64),
 
     /// Fraktur/Gothic mode (note: Wikipedia notes lack of wide support).
     Fraktur,

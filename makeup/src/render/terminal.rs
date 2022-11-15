@@ -6,6 +6,7 @@ use eyre::Result;
 
 use crate::component::DrawCommandBatch;
 use crate::{Ansi, DrawCommand};
+use crate::{Coordinate, Coordinates, Dimension, RelativeCoordinate};
 
 use super::{MemoryRenderer, Renderer};
 
@@ -90,21 +91,21 @@ impl Renderer for TerminalRenderer {
                     DrawCommand::MoveCursorRelative { x, y } => {
                         match x.cmp(&0) {
                             std::cmp::Ordering::Less => {
-                                print!("{}", Ansi::CursorLeft(-x as usize));
+                                print!("{}", Ansi::CursorLeft(-x as Dimension));
                             }
                             std::cmp::Ordering::Equal => {}
                             std::cmp::Ordering::Greater => {
-                                print!("{}", Ansi::CursorRight(*x as usize));
+                                print!("{}", Ansi::CursorRight(*x as Dimension));
                             }
                         }
 
                         match y.cmp(&0) {
                             std::cmp::Ordering::Less => {
-                                print!("{}", Ansi::CursorUp(-y as usize));
+                                print!("{}", Ansi::CursorUp(-y as Dimension));
                             }
                             std::cmp::Ordering::Equal => {}
                             std::cmp::Ordering::Greater => {
-                                print!("{}", Ansi::CursorDown(*y as usize));
+                                print!("{}", Ansi::CursorDown(*y as Dimension));
                             }
                         }
                     }
@@ -121,51 +122,62 @@ impl Renderer for TerminalRenderer {
         Ok(())
     }
 
-    async fn move_cursor(&mut self, x: usize, y: usize) -> eyre::Result<()> {
+    async fn move_cursor(&mut self, x: Coordinate, y: Coordinate) -> eyre::Result<()> {
         let res = self.memory_renderer.move_cursor(x, y).await;
         print!("{}", Ansi::CursorPosition(x, y),);
         res
     }
 
-    async fn move_cursor_relative(&mut self, x: isize, y: isize) -> eyre::Result<()> {
+    async fn move_cursor_relative(
+        &mut self,
+        x: RelativeCoordinate,
+        y: RelativeCoordinate,
+    ) -> eyre::Result<()> {
         let res = self.memory_renderer.move_cursor_relative(x, y).await;
         match x.cmp(&0) {
             std::cmp::Ordering::Less => {
-                print!("{}", Ansi::CursorLeft(-x as usize));
+                print!("{}", Ansi::CursorLeft(-x as Dimension));
             }
             std::cmp::Ordering::Equal => {}
             std::cmp::Ordering::Greater => {
-                print!("{}", Ansi::CursorRight(x as usize));
+                print!("{}", Ansi::CursorRight(x as Dimension));
             }
         }
 
         match y.cmp(&0) {
             std::cmp::Ordering::Less => {
-                print!("{}", Ansi::CursorUp(-y as usize));
+                print!("{}", Ansi::CursorUp(-y as Dimension));
             }
             std::cmp::Ordering::Equal => {}
             std::cmp::Ordering::Greater => {
-                print!("{}", Ansi::CursorDown(y as usize));
+                print!("{}", Ansi::CursorDown(y as Dimension));
             }
         }
         res
     }
 
-    async fn read_at_cursor(&self, width: usize) -> eyre::Result<String> {
+    async fn read_at_cursor(&self, width: Dimension) -> eyre::Result<String> {
         self.memory_renderer.read_at_cursor(width).await
     }
 
-    async fn read_string(&self, x: usize, y: usize, width: usize) -> eyre::Result<String> {
+    async fn read_string(
+        &self,
+        x: Coordinate,
+        y: Coordinate,
+        width: Dimension,
+    ) -> eyre::Result<String> {
         self.memory_renderer.read_string(x, y, width).await
     }
 
-    fn cursor(&self) -> (usize, usize) {
+    fn cursor(&self) -> Coordinates {
         self.memory_renderer.cursor()
     }
 }
 
 mod ioctls {
-    pub fn get_terminal_size() -> (usize, usize) {
+    use crate::Dimension;
+
+    pub fn get_terminal_size() -> (Dimension, Dimension) {
         use std::mem::zeroed;
 
         // Safety: Unfortuantely no other way to do this, ioctls suck.
@@ -175,7 +187,7 @@ mod ioctls {
             // https://github.com/rust-lang/libc/pull/704
             // FIXME: ".into()" used as a temporary fix for a libc bug
             match libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut size) {
-                0 => (size.ws_col as usize, size.ws_row as usize),
+                0 => (size.ws_col as Dimension, size.ws_row as Dimension),
                 _ => (80, 24),
             }
         }
