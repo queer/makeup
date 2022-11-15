@@ -13,6 +13,10 @@ makeup is still early-stage!!! Treat it like the alpha project it is.
 
 See [`examples/`](https://github.com/queer/makeup/tree/mistress/makeup/examples)!
 
+### Demos
+
+`cargo run --example wave`
+
 ## Setup
 
 Install [pre-commit](https://pre-commit.com/).
