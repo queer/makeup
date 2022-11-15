@@ -4,6 +4,15 @@ Pretty CLI / TUI interfaces.
 
 MSRV 1.65.
 
+
+## READ ME FIRST
+
+makeup is still early-stage!!! Treat it like the alpha project it is.
+
+### Usage examples
+
+See [`examples/`](https://github.com/queer/makeup/tree/mistress/makeup/examples)!
+
 ## Setup
 
 Install [pre-commit](https://pre-commit.com/).
