@@ -9,6 +9,8 @@ MSRV 1.65.
 
 makeup is still early-stage!!! Treat it like the alpha project it is.
 
+[crates.io](https://crates.io/crates/makeup)
+
 ### Usage examples
 
 See [`examples/`](https://github.com/queer/makeup/tree/mistress/makeup/examples)!
