@@ -1,6 +1,7 @@
 [package]
 name = "makeup"
 description = "Stylish CLIs/TUIs for Rust!"
+repository = "https://github.com/queer/makeup"
 license = "MIT"
 version = "0.0.1"
 edition = "2021"
