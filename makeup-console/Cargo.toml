@@ -1,6 +1,8 @@
 [package]
 name = "makeup-console"
-version = "0.1.0"
+description = "Console helper library for makeup'"
+license = "MIT"
+version = "0.0.1"
 edition = "2021"
 
 [dependencies]

@@ -1,6 +1,8 @@
 [package]
 name = "makeup"
-version = "0.1.0"
+description = "Stylish CLIs/TUIs for Rust!"
+license = "MIT"
+version = "0.0.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
