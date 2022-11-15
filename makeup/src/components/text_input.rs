@@ -50,8 +50,8 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
                         MakeupMessage::Keypress(Keypress::Char(c)) => {
                             self.buffer.push(*c);
                         }
-                        // TODO: This has to handle the buffer state properly, because
                         MakeupMessage::Keypress(Keypress::Backspace) => {
+                            // TODO: This has to manage the buffer state properly, and indicate to the render loop that some characters need to be erased.
                             self.buffer.pop();
                         }
                         _ => {}
