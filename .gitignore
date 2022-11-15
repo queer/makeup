@@ -1,2 +1,4 @@
 /target
 /tmp
+/graph.svg
+/perf.data*

@@ -1,8 +1,6 @@
-use std::hash::{Hash, Hasher};
-use std::io::Write;
-
 use async_trait::async_trait;
 use eyre::Result;
+use tokio::io::AsyncWriteExt;
 
 use crate::component::DrawCommandBatch;
 use crate::{Ansi, DrawCommand};
@@ -15,22 +13,6 @@ use super::{MemoryRenderer, Renderer};
 pub struct TerminalRenderer {
     memory_renderer: MemoryRenderer,
     saved_position: bool,
-    hasher: Fnv,
-    last_render_hash: Option<u64>,
-}
-
-struct Fnv(fnv::FnvHasher);
-
-impl Fnv {
-    pub fn reset(&mut self) {
-        self.0 = fnv::FnvHasher::default();
-    }
-}
-
-impl std::fmt::Debug for Fnv {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Fnv").field(&self.0.finish()).finish()
-    }
 }
 
 impl TerminalRenderer {
@@ -41,8 +23,6 @@ impl TerminalRenderer {
         Self {
             memory_renderer: MemoryRenderer::new(w, h),
             saved_position: false,
-            hasher: Fnv(fnv::FnvHasher::default()),
-            last_render_hash: None,
         }
     }
 }
@@ -54,70 +34,67 @@ impl Renderer for TerminalRenderer {
         // Not restoring the cursor position until we've saved it the first
         // time ensures that ex. the cursor will be positioned at the expected
         // character when rendering.
-        if self.saved_position {
-            print!("{}", Ansi::RestoreCursorPosition);
+        let mut buffer = String::new();
 
-            // If the previous batch renders to the same hash as the current
-            // batch, skip rendering the batch.
-            self.hasher.reset();
-            for command in commands {
-                command.hash(&mut self.hasher.0);
-            }
-            let hash = self.hasher.0.finish();
-            if Some(hash) == self.last_render_hash {
-                return Ok(());
-            }
+        if self.saved_position {
+            buffer += &Ansi::RestoreCursorPosition.to_string();
         } else {
             self.saved_position = true;
         }
-        print!("{}", Ansi::SaveCursorPosition);
+        buffer += &Ansi::SaveCursorPosition.to_string();
 
         for (_key, commands) in commands {
             // debug!("rendering to terminal: {}", key);
             for command in commands {
                 match command {
                     DrawCommand::TextUnderCursor(text) => {
-                        print!("{}", text);
+                        buffer += text;
                     }
                     DrawCommand::CharUnderCursor(c) => {
-                        print!("{}", c);
+                        buffer.push(*c);
                     }
                     DrawCommand::EraseCurrentLine(mode) => {
-                        print!("{}", Ansi::EraseInLine(mode.clone()));
+                        buffer += &Ansi::EraseInLine(mode.clone()).to_string();
                     }
                     DrawCommand::TextAt { x, y, text } => {
-                        print!("{}{}", Ansi::CursorPosition(*x, *y), text);
+                        buffer += &Ansi::CursorPosition(*x, *y).to_string();
+                        buffer += text;
                     }
                     DrawCommand::MoveCursorRelative { x, y } => {
                         match x.cmp(&0) {
                             std::cmp::Ordering::Less => {
-                                print!("{}", Ansi::CursorLeft(-x as Dimension));
+                                buffer += &Ansi::CursorLeft(-x as Dimension).to_string();
                             }
                             std::cmp::Ordering::Equal => {}
                             std::cmp::Ordering::Greater => {
-                                print!("{}", Ansi::CursorRight(*x as Dimension));
+                                buffer += &Ansi::CursorRight(*x as Dimension).to_string();
                             }
                         }
 
                         match y.cmp(&0) {
                             std::cmp::Ordering::Less => {
-                                print!("{}", Ansi::CursorUp(-y as Dimension));
+                                buffer += &Ansi::CursorUp(-y as Dimension).to_string();
                             }
                             std::cmp::Ordering::Equal => {}
                             std::cmp::Ordering::Greater => {
-                                print!("{}", Ansi::CursorDown(*y as Dimension));
+                                buffer += &Ansi::CursorDown(*y as Dimension).to_string();
                             }
                         }
                     }
                     DrawCommand::MoveCursorAbsolute { x, y } => {
-                        print!("{}", Ansi::CursorPosition(*x, *y));
+                        buffer += &Ansi::CursorPosition(*x, *y).to_string();
                     }
                 }
             }
         }
 
+        tokio::io::stdout().write_all(buffer.as_bytes()).await?;
+        tokio::io::stdout().flush().await?;
+
+        // print!("{}", buffer);
+
         // NOTE: Can't flush with tokio, doesn't work for some reason.
-        std::io::stdout().flush()?;
+        // std::io::stdout().flush()?;
 
         Ok(())
     }
