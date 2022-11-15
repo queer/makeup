@@ -96,6 +96,11 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
         let mut last_fps: f64 = 0f64;
         let mut effective_fps: f64 = 0f64;
         let mut frame_counter = 0u128;
+        let (cursor, dimensions) = {
+            let renderer = self.renderer.read().await;
+
+            (renderer.cursor(), renderer.dimensions())
+        };
         'render_loop: loop {
             let start = Instant::now();
             let render_context = RenderContext {
@@ -103,6 +108,8 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
                 frame_counter,
                 fps: last_fps,
                 effective_fps,
+                cursor,
+                dimensions,
             };
 
             let mut pending_input = vec![];
@@ -162,6 +169,8 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
             frame_counter: 0,
             fps: 0f64,
             effective_fps: 0f64,
+            cursor: (0, 0),
+            dimensions: (0, 0),
         };
 
         self.render_frame(&[], &ctx).await
@@ -329,15 +338,9 @@ mod tests {
 
         async fn render(&self, _ctx: &RenderContext) -> Result<DrawCommandBatch> {
             if !self.was_pinged {
-                Ok((
-                    self.key,
-                    vec![DrawCommand::TextUnderCursor("ping?".to_string())],
-                ))
+                Ok((self.key, vec![DrawCommand::TextUnderCursor("ping?".into())]))
             } else {
-                Ok((
-                    self.key,
-                    vec![DrawCommand::TextUnderCursor("pong!".to_string())],
-                ))
+                Ok((self.key, vec![DrawCommand::TextUnderCursor("pong!".into())]))
             }
         }
 
@@ -376,7 +379,7 @@ mod tests {
             assert_eq!("ping?".to_string(), renderer.read_at_cursor(5).await?);
         }
 
-        ui.send(key, "ping".to_string()).await;
+        ui.send(key, "ping".into()).await;
         ui.render_once().await?;
 
         {

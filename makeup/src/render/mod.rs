@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::component::DrawCommandBatch;
 use crate::util::AsAny;
-use crate::{Coordinate, Coordinates, Dimension, RelativeCoordinate};
+use crate::{Coordinate, Coordinates, Dimension, Dimensions, RelativeCoordinate};
 
 pub mod memory;
 pub mod terminal;
@@ -36,6 +36,8 @@ pub trait Renderer: std::fmt::Debug + AsAny {
     async fn read_string(&self, x: Coordinate, y: Coordinate, width: Dimension) -> Result<String>;
 
     fn cursor(&self) -> Coordinates;
+
+    fn dimensions(&self) -> Dimensions;
 }
 
 /// An error that occurred during rendering.

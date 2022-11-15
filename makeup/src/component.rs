@@ -8,7 +8,7 @@ use makeup_console::Keypress;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 
-use crate::{post_office::PostOffice, DrawCommand};
+use crate::{post_office::PostOffice, Coordinates, Dimensions, DrawCommand};
 
 /// A key that uniquely identifies a [`Component`].
 pub type Key = u64;
@@ -46,6 +46,8 @@ pub struct RenderContext {
     pub frame_counter: u128,
     pub fps: f64,
     pub effective_fps: f64,
+    pub cursor: Coordinates,
+    pub dimensions: Dimensions,
 }
 
 /// A default message that can be sent to a component. Contains a lot of the

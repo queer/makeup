@@ -40,9 +40,13 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> 
         Ok((
             self.key,
             vec![DrawCommand::TextUnderCursor(format!(
-                "FPS: {:.2} (effective: {:.2}), last frame: {}ms, frame: {}",
+                "FPS: {:.2} (effective: {:.2}), dimensions: ({}, {}), cursor (when this render started): ({}, {}), last frame: {}ms, frame: {}",
                 ctx.fps,
                 ctx.effective_fps,
+                ctx.dimensions.0,
+                ctx.dimensions.1,
+                ctx.cursor.0,
+                ctx.cursor.1,
                 ctx.last_frame_time.map(|d| d.as_millis()).unwrap_or(0),
                 ctx.frame_counter
             ))],
@@ -79,7 +83,7 @@ mod tests {
         let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
             vec![DrawCommand::TextUnderCursor(
-                "FPS: 0.00 (effective: 0.00), last frame: 0ms, frame: 0".to_string(),
+                "FPS: 0.00 (effective: 0.00), dimensions: (0, 0), cursor (when this render started): (0, 0), last frame: 0ms, frame: 0".into(),
             )]
             .as_slice(),
             render.as_slice(),

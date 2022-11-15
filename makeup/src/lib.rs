@@ -12,10 +12,11 @@ pub use ui::MUI;
 
 pub use makeup_ansi::prelude::*;
 
-pub type Dimension = u64;
 pub type Coordinate = u64;
-pub type RelativeCoordinate = i64;
 pub type Coordinates = (Coordinate, Coordinate);
+pub type Dimension = u64;
+pub type Dimensions = (Dimension, Dimension);
+pub type RelativeCoordinate = i64;
 
 /// Commands for drawing to the character grid. Draw commands are processed by
 /// the current [`Renderer`].
@@ -58,6 +59,8 @@ pub fn fake_render_ctx() -> component::RenderContext {
         frame_counter: 0,
         fps: 0f64,
         effective_fps: 0f64,
+        cursor: (0, 0),
+        dimensions: (0, 0),
     }
 }
 
@@ -96,7 +99,7 @@ mod tests {
         async fn render(&self, _ctx: &RenderContext) -> Result<DrawCommandBatch> {
             Ok((
                 self.key,
-                vec![DrawCommand::TextUnderCursor("henol world".to_string())],
+                vec![DrawCommand::TextUnderCursor("henol world".into())],
             ))
         }
 

@@ -4,7 +4,7 @@ use makeup_ansi::LineEraseMode;
 
 use super::RenderError;
 use crate::component::DrawCommandBatch;
-use crate::{Coordinate, Coordinates, Dimension, RelativeCoordinate};
+use crate::{Coordinate, Coordinates, Dimension, Dimensions, RelativeCoordinate};
 use crate::{DrawCommand, Renderer};
 
 /// A [`Renderer`] that renders to an in-memory grid.
@@ -123,6 +123,10 @@ impl Renderer for MemoryRenderer {
 
     fn cursor(&self) -> Coordinates {
         (self.cursor_x, self.cursor_y)
+    }
+
+    fn dimensions(&self) -> Dimensions {
+        (self.width, self.height)
     }
 }
 

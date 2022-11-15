@@ -172,20 +172,22 @@ impl Renderer for TerminalRenderer {
     fn cursor(&self) -> Coordinates {
         self.memory_renderer.cursor()
     }
+
+    fn dimensions(&self) -> Coordinates {
+        self.memory_renderer.dimensions()
+    }
 }
 
 mod ioctls {
-    use crate::Dimension;
+    use crate::{Dimension, Dimensions};
 
-    pub fn get_terminal_size() -> (Dimension, Dimension) {
+    pub fn get_terminal_size() -> Dimensions {
         use std::mem::zeroed;
 
         // Safety: Unfortuantely no other way to do this, ioctls suck.
         #[allow(unsafe_code)]
         unsafe {
             let mut size: libc::winsize = zeroed();
-            // https://github.com/rust-lang/libc/pull/704
-            // FIXME: ".into()" used as a temporary fix for a libc bug
             match libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut size) {
                 0 => (size.ws_col as Dimension, size.ws_row as Dimension),
                 _ => (80, 24),

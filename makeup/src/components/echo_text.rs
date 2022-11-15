@@ -92,7 +92,7 @@ mod tests {
 
         let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
-            vec![DrawCommand::TextUnderCursor("henol world".to_string(),)].as_slice(),
+            vec![DrawCommand::TextUnderCursor("henol world".into(),)].as_slice(),
             render.as_slice(),
         );
 
