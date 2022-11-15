@@ -19,3 +19,6 @@ fnv = "1.0.7"
 
 [dependencies.makeup-ansi]
 path = "../makeup-ansi"
+
+[dependencies.makeup-console]
+path = "../makeup-console"

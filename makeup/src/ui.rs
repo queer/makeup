@@ -4,10 +4,13 @@ use std::time::Duration;
 use async_recursion::async_recursion;
 use either::Either;
 use eyre::Result;
+use makeup_console::Keypress;
+use tokio::sync::mpsc::error::TryRecvError;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 
-use crate::component::{DrawCommandBatch, Key, RenderContext, UpdateContext};
+use crate::component::{DrawCommandBatch, Key, MakeupMessage, RenderContext, UpdateContext};
 use crate::post_office::PostOffice;
 use crate::util::RwLocked;
 use crate::{Ansi, Component, DisplayEraseMode, Renderer};
@@ -20,16 +23,22 @@ use crate::{Ansi, Component, DisplayEraseMode, Renderer};
 /// messages back to the UI via the [`PostOffice`].
 #[derive(Debug)]
 pub struct MUI<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> {
-    ui: Mutex<UI<'a, M>>,
+    ui: Arc<Mutex<UI<'a, M>>>,
     renderer: RwLocked<&'a mut dyn Renderer>,
+    input_tx: Arc<Mutex<UnboundedSender<InputFrame>>>,
+    input_rx: Arc<Mutex<UnboundedReceiver<InputFrame>>>,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
     /// Create a new makeup UI with the given root component and renderer.
     pub fn new(root: &'a mut dyn Component<Message = M>, renderer: &'a mut dyn Renderer) -> Self {
+        let (input_tx, input_rx) = tokio::sync::mpsc::unbounded_channel();
+
         Self {
-            ui: Mutex::new(UI::new(root)),
+            ui: Arc::new(Mutex::new(UI::new(root))),
             renderer: RwLocked::new(renderer),
+            input_tx: Arc::new(Mutex::new(input_tx)),
+            input_rx: Arc::new(Mutex::new(input_rx)),
         }
     }
 
@@ -57,9 +66,40 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
         let mut effective_fps: f64 = 0f64;
         let mut frame_counter = 0u128;
 
-        loop {
-            let start = Instant::now();
+        let input_tx_lock = self.input_tx.clone();
+        tokio::spawn(async move {
+            loop {
+                let tx = input_tx_lock.lock().await;
+                match makeup_console::next_keypress().await {
+                    Ok(key) => {
+                        dbg!(&key);
+                        tx.send(InputFrame::Frame(key)).unwrap();
+                    }
+                    Err(e) => {
+                        if let Some(err) = e.chain().next() {
+                            match err.downcast_ref() {
+                                Some(makeup_console::ConsoleError::Io(e)) => {
+                                    if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                                        tx.send(InputFrame::End).unwrap();
+                                        break;
+                                    }
+                                }
+                                Some(makeup_console::ConsoleError::Interrupted) => {
+                                    tx.send(InputFrame::End).unwrap();
+                                    break;
+                                }
+                                _ => {}
+                            }
+                        }
+                        eprintln!("Error: {}", e);
+                    }
+                }
+            }
+        });
 
+        let mut start = Instant::now();
+
+        'render_loop: loop {
             let render_context = RenderContext {
                 last_frame_time,
                 frame_counter,
@@ -67,7 +107,32 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
                 effective_fps,
             };
 
-            self.render_frame(&render_context).await?;
+            let mut pending_input = vec![];
+            let mut rx = self.input_rx.lock().await;
+
+            loop {
+                match rx.try_recv() {
+                    Ok(InputFrame::Frame(key)) => {
+                        pending_input.push(key);
+                    }
+                    Ok(InputFrame::End) => {
+                        break 'render_loop;
+                    }
+                    Err(TryRecvError::Disconnected) => {
+                        eprintln!("Error: Input disconnected!?");
+                        break 'render_loop;
+                    }
+                    Err(_) => {
+                        break;
+                    }
+                }
+            }
+
+            if let Err(e) = self.render_frame(&pending_input, &render_context).await {
+                // TODO: Handle gracefully
+                eprintln!("Error: {}", e);
+                break 'render_loop;
+            }
             frame_counter += 1;
 
             let elapsed = start.elapsed();
@@ -78,7 +143,9 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
             } else {
                 effective_fps
             };
+            start = Instant::now();
 
+            // TODO: This fucks input doesn't it?
             if let Some(duration) = frame_target.checked_sub(elapsed) {
                 tokio::time::sleep(duration).await
             } else {
@@ -100,15 +167,15 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
             effective_fps: 0f64,
         };
 
-        self.render_frame(&ctx).await
+        self.render_frame(&[], &ctx).await
     }
 
     /// Apply any pending `Mailbox`es and render the current frame. Makes no
     /// guarantees about hitting a framerate target, but instead renders as
     /// fast as possible.
-    async fn render_frame(&'a self, ctx: &RenderContext) -> Result<()> {
+    async fn render_frame(&'a self, pending_input: &[Keypress], ctx: &RenderContext) -> Result<()> {
         let ui = self.ui.lock().await;
-        let commands = ui.render(ctx).await?;
+        let commands = ui.render(pending_input, ctx).await?;
 
         let mut renderer = self.renderer.write().await;
         renderer.render(&commands).await?;
@@ -128,6 +195,12 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
     }
 }
 
+#[derive(Debug, Clone)]
+enum InputFrame {
+    Frame(Keypress),
+    End,
+}
+
 #[derive(Debug)]
 struct UI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
     root: RwLocked<&'a mut dyn Component<Message = M>>,
@@ -145,11 +218,34 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
     /// Render the entire UI.
     // TODO: Graceful error handling...
-    pub async fn render(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
+    pub async fn render(
+        &self,
+        pending_input: &[Keypress],
+        ctx: &RenderContext,
+    ) -> Result<Vec<DrawCommandBatch>> {
+        {
+            let root = &self.root.read().await;
+            Self::mail_pending_input(pending_input, self.post_office.clone(), root.key()).await;
+        }
+
         Self::update_recursive(&self.root, self.post_office.clone()).await?;
-        let root = &self.root.read().await;
-        let draw_commands = root.render_pass(ctx).await?;
-        Ok(draw_commands)
+
+        {
+            let root = &self.root.read().await;
+            let draw_commands = root.render_pass(ctx).await?;
+            Ok(draw_commands)
+        }
+    }
+
+    async fn mail_pending_input(
+        pending_input: &[Keypress],
+        post_office_lock: Arc<Mutex<PostOffice<M>>>,
+        focused_component: Key,
+    ) {
+        let mut post_office = post_office_lock.lock().await;
+        for keypress in pending_input {
+            post_office.send_makeup(focused_component, MakeupMessage::Keypress(keypress.clone()));
+        }
     }
 
     #[async_recursion]
@@ -196,9 +292,9 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
     }
 
     #[allow(unused)]
-    pub async fn send_makeup(&self, key: Key, message: M) {
+    pub async fn send_makeup(&self, key: Key, message: MakeupMessage) {
         let mut post_office = self.post_office.lock().await;
-        post_office.send(key, message);
+        post_office.send_makeup(key, message);
     }
 }
 
@@ -285,7 +381,7 @@ mod tests {
 
         let mut renderer = MemoryRenderer::new(128, 128);
         let ui = MUI::new(&mut root, &mut renderer);
-        ui.render_frame(&crate::fake_render_ctx()).await?;
+        ui.render_once().await?;
 
         {
             let mut renderer = ui.renderer().write().await;
@@ -294,7 +390,7 @@ mod tests {
         }
 
         ui.send(key, "ping".to_string()).await;
-        ui.render_frame(&crate::fake_render_ctx()).await?;
+        ui.render_once().await?;
 
         {
             let mut renderer = ui.renderer().write().await;

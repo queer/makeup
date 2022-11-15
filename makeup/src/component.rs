@@ -4,6 +4,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use either::Either;
 use eyre::Result;
+use makeup_console::Keypress;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 
@@ -55,6 +56,7 @@ pub struct RenderContext {
 pub enum MakeupMessage {
     TimerTick(Duration),
     TextUpdate(String),
+    Keypress(Keypress),
 }
 
 /// A component in a makeup UI. Stateless components can be implemented via

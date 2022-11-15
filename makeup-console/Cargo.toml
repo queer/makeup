@@ -1,0 +1,15 @@
+[package]
+name = "makeup-console"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.21.2", features = ["full"] }
+eyre = "0.6.8"
+nix = "0.25.0"
+libc = "0.2.137"
+async-recursion = "1.0.0"
+thiserror = "1.0.37"
+
+[dependencies.makeup-ansi]
+path = "../makeup-ansi"
