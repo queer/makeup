@@ -7,7 +7,7 @@ use makeup::component::{
     DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
 };
 use makeup::render::terminal::TerminalRenderer;
-use makeup::{Ansi, Component, DrawCommand, SgrParameter, MUI};
+use makeup::{Ansi, Component, DrawCommand, LineEraseMode, SgrParameter, MUI};
 
 use eyre::Result;
 
@@ -118,9 +118,12 @@ impl Component for Wave {
             });
         }
 
+        commands.push(DrawCommand::EraseCurrentLine(
+            LineEraseMode::FromCursorToEnd,
+        ));
         commands.push(DrawCommand::TextUnderCursor(format!(
-            "{}fps ({:.2}fps effective)",
-            ctx.fps, ctx.effective_fps
+            "{}fps ({:.2}fps effective), dimensions {:?}",
+            ctx.fps, ctx.effective_fps, ctx.dimensions
         )));
 
         Ok((self.key, commands))
