@@ -14,6 +14,7 @@ macro_rules! ansi {
 }
 
 /// ANSI escape sequences. Can be directly formatted into strings.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ansi {
     // Cursor manipulation
     /// Set the (x, y) cursor position.
@@ -344,6 +345,7 @@ impl std::fmt::Display for Ansi {
 }
 
 /// Terminal cursor styles.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CursorStyle {
     /// The cursor is a block.
     Block,
@@ -356,6 +358,7 @@ pub enum CursorStyle {
 }
 
 /// Terminal cursor visibility.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CursorVisibility {
     /// The cursor is visible.
     Visible,
@@ -365,7 +368,7 @@ pub enum CursorVisibility {
 }
 
 /// Default 8-bit colour palette.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Colour {
     /// Black.
     Black,
@@ -424,6 +427,7 @@ impl Colour {
 }
 
 /// Erase part or all of the current display.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DisplayEraseMode {
     /// Erase from the cursor to the end of the display.
     FromCursorToEnd,
@@ -439,6 +443,7 @@ pub enum DisplayEraseMode {
 }
 
 /// Erase part or all of the current line. Does not move the cursor.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LineEraseMode {
     /// Erase from the cursor to the end of the line.
     FromCursorToEnd,
@@ -451,6 +456,7 @@ pub enum LineEraseMode {
 }
 
 /// See: <https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters>
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SgrParameter {
     /// Reset all attributes.
     Reset,

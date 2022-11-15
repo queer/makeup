@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use either::Either;
 use eyre::Result;
+use makeup_ansi::LineEraseMode;
 use makeup_console::Keypress;
 
 use crate::component::{
@@ -16,6 +17,7 @@ pub struct TextInput<Message: std::fmt::Debug + Send + Sync + Clone> {
     prompt: String,
     key: Key,
     buffer: String,
+    input_offset: Option<i32>,
     _phantom: PhantomData<Message>,
 }
 
@@ -25,6 +27,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> TextInput<Message> {
             prompt: prompt.into(),
             buffer: String::new(),
             key: crate::component::generate_key(),
+            input_offset: None,
             _phantom: PhantomData,
         }
     }
@@ -39,6 +42,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
         ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
     ) -> Result<()> {
         if let Some(mailbox) = ctx.post_office.mailbox(self) {
+            let mut offset = 0i32;
             for msg in mailbox.iter() {
                 match msg {
                     Either::Left(_msg) => {
@@ -51,29 +55,50 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
                             self.buffer.push(*c);
                         }
                         MakeupMessage::Keypress(Keypress::Backspace) => {
-                            // TODO: This has to manage the buffer state properly, and indicate to the render loop that some characters need to be erased.
                             self.buffer.pop();
+                            offset -= 1;
                         }
                         _ => {}
                     },
                 }
             }
             mailbox.clear();
+            if offset != 0 {
+                self.input_offset = Some(offset);
+            } else {
+                self.input_offset = None;
+            }
         }
 
         Ok(())
     }
 
     async fn render(&self, _ctx: &RenderContext) -> Result<DrawCommandBatch> {
-        Ok((
-            self.key,
-            vec![
-                DrawCommand::TextUnderCursor(self.prompt.clone()),
-                DrawCommand::CharUnderCursor(':'),
-                DrawCommand::CharUnderCursor(' '),
-                DrawCommand::TextUnderCursor(self.buffer.clone()),
-            ],
-        ))
+        match self.input_offset {
+            Some(offset) if offset < 0 => {
+                // If we have a negative offset, erase to the end of the line.
+                Ok((
+                    self.key,
+                    vec![
+                        DrawCommand::TextUnderCursor(self.prompt.clone()),
+                        DrawCommand::CharUnderCursor(':'),
+                        DrawCommand::CharUnderCursor(' '),
+                        DrawCommand::TextUnderCursor(self.buffer.clone()),
+                        // TODO: This should probably just replace the characters with whitespace...
+                        DrawCommand::EraseCurrentLine(LineEraseMode::FromCursorToEnd),
+                    ],
+                ))
+            }
+            _ => Ok((
+                self.key,
+                vec![
+                    DrawCommand::TextUnderCursor(self.prompt.clone()),
+                    DrawCommand::CharUnderCursor(':'),
+                    DrawCommand::CharUnderCursor(' '),
+                    DrawCommand::TextUnderCursor(self.buffer.clone()),
+                ],
+            )),
+        }
     }
 
     async fn update_pass(

@@ -15,7 +15,7 @@ pub use makeup_ansi::prelude::*;
 
 /// Commands for drawing to the character grid. Draw commands are processed by
 /// the current [`Renderer`].
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DrawCommand {
     /// Draw text under the cursor, advancing the cursor by `text.len()`
     /// characters.
@@ -24,6 +24,10 @@ pub enum DrawCommand {
     /// Draw a single character under the cursor, advancing the cursor by 1
     /// character.
     CharUnderCursor(char),
+
+    /// Erase the current line, with behaviour depending on the position of the
+    /// cursor and the [`LineEraseMode`] passed in.
+    EraseCurrentLine(LineEraseMode),
 
     /// Draw text at the given (x, y), moving the cursor to
     /// `(x + text.len(), y)`.

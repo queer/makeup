@@ -1,8 +1,10 @@
 use async_trait::async_trait;
 use eyre::Result;
+use makeup_ansi::LineEraseMode;
 
 use super::RenderError;
-use crate::{component::DrawCommandBatch, DrawCommand, Renderer};
+use crate::component::DrawCommandBatch;
+use crate::{DrawCommand, Renderer};
 
 /// A [`Renderer`] that renders to an in-memory grid.
 #[derive(Debug)]
@@ -35,6 +37,23 @@ impl Renderer for MemoryRenderer {
                         self.text.insert((self.cursor_x, self.cursor_y), *c);
                         self.cursor_x += 1;
                     }
+                    DrawCommand::EraseCurrentLine(mode) => match mode {
+                        LineEraseMode::FromCursorToStart => {
+                            for x in 0..self.cursor_x {
+                                self.text.remove(&(x, self.cursor_y));
+                            }
+                        }
+                        LineEraseMode::FromCursorToEnd => {
+                            for x in self.cursor_x..self.width {
+                                self.text.remove(&(x, self.cursor_y));
+                            }
+                        }
+                        LineEraseMode::All => {
+                            for x in 0..self.width {
+                                self.text.remove(&(x, self.cursor_y));
+                            }
+                        }
+                    },
                     DrawCommand::TextAt { x, y, text } => {
                         self.bounds_check(*x, *y)?;
                         self.bounds_check(*x + text.len(), *y)?;

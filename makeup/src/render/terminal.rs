@@ -81,6 +81,9 @@ impl Renderer for TerminalRenderer {
                     DrawCommand::CharUnderCursor(c) => {
                         print!("{}", c);
                     }
+                    DrawCommand::EraseCurrentLine(mode) => {
+                        print!("{}", Ansi::EraseInLine(mode.clone()));
+                    }
                     DrawCommand::TextAt { x, y, text } => {
                         print!("{}{}", Ansi::CursorPosition(*x, *y), text);
                     }
