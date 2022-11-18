@@ -1,9 +1,12 @@
 [package]
 name = "makeup-console"
-description = "Console helper library for makeup'"
+description = "Console helper library for makeup"
+repository = "https://github.com/queer/makeup"
 license = "MIT"
 version = "0.0.1"
 edition = "2021"
+categories = ["Command-line interface"]
+keywords = ["console"]
 
 [dependencies]
 tokio = { version = "1.21.2", features = ["full"] }

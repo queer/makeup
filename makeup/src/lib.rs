@@ -1,4 +1,10 @@
 #![deny(unsafe_code)]
+#![deny(
+    rustdoc::broken_intra_doc_links,
+    rustdoc::bare_urls,
+    rustdoc::private_intra_doc_links
+)]
+#![deny(clippy::perf, clippy::complexity, clippy::cargo)]
 pub mod component;
 pub mod components;
 pub mod post_office;
