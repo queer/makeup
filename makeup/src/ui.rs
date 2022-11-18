@@ -274,7 +274,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         }
         post_office.clear_ui_mailbox();
 
-        Self::mail_pending_input(pending_input, &mut post_office, root.key());
+        Self::mail_pending_input(pending_input, &mut post_office, self.focus);
         Self::update_recursive(
             *root,
             &mut post_office,
