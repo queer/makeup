@@ -373,16 +373,27 @@ mod tests {
     use eyre::Result;
 
     #[derive(Debug)]
-    struct PingableComponent {
+    struct PingableComponent<'a> {
         #[allow(dead_code)]
         state: (),
         key: Key,
         was_pinged: bool,
+        children: Vec<&'a mut dyn Component<Message = String>>,
     }
 
     #[async_trait]
-    impl Component for PingableComponent {
+    impl<'a> Component for PingableComponent<'a> {
         type Message = String;
+
+        fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+            let mut out = vec![];
+
+            for child in &self.children {
+                out.push(&**child);
+            }
+
+            Some(out)
+        }
 
         async fn update(
             &mut self,
@@ -432,6 +443,7 @@ mod tests {
             state: (),
             key: crate::component::generate_key(),
             was_pinged: false,
+            children: vec![],
         };
         let key = root.key();
 

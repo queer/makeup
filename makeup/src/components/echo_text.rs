@@ -31,6 +31,10 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> EchoText<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Message> {
     type Message = Message;
 
+    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+        None
+    }
+
     async fn update(
         &mut self,
         ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,

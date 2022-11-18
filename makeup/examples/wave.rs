@@ -51,6 +51,10 @@ impl Wave {
 impl Component for Wave {
     type Message = ();
 
+    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+        None
+    }
+
     async fn update(
         &mut self,
         ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,

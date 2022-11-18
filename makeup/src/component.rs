@@ -82,6 +82,9 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     /// The type of messages that can be sent to this component.
     type Message: std::fmt::Debug + Send + Sync + Clone;
 
+    /// The children this component has. May be empty when present.
+    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>>;
+
     /// Process any messages that have been sent to this component. Messages
     /// are expected to be process asynchronously, ie. any long-running
     /// operations should be [`tokio::spawn`]ed as a task.

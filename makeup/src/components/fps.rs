@@ -29,6 +29,10 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Fps<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> {
     type Message = Message;
 
+    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+        None
+    }
+
     async fn update(
         &mut self,
         _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,

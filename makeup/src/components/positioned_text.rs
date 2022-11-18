@@ -35,6 +35,10 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PositionedText<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedText<Message> {
     type Message = Message;
 
+    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+        None
+    }
+
     async fn update(
         &mut self,
         ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,

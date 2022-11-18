@@ -96,6 +96,10 @@ mod tests {
     impl<'a> Component for BasicComponent<'a> {
         type Message = ();
 
+        fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+            None
+        }
+
         async fn update(
             &mut self,
             _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
