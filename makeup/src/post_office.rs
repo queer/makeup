@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use either::Either;
 
 use crate::component::{Key, Mailbox, MakeupMessage, RawComponentMessage};
+use crate::ui::UiControlMessage;
 use crate::Component;
 
 /// The post office is used for managing component mailboxes, including sending
@@ -10,6 +11,7 @@ use crate::Component;
 #[derive(Debug)]
 pub struct PostOffice<Message: std::fmt::Debug + Send + Sync + Clone> {
     boxes: HashMap<Key, Vec<RawComponentMessage<Message>>>,
+    ui_mailbox: Vec<UiControlMessage>,
 }
 
 impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
@@ -18,6 +20,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
     pub fn new() -> Self {
         Self {
             boxes: HashMap::new(),
+            ui_mailbox: vec![],
         }
     }
 
@@ -37,11 +40,26 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
             .push(Either::Right(message));
     }
 
+    /// Send a UI control message to the UI message queue.
+    pub fn send_control(&mut self, message: UiControlMessage) {
+        self.ui_mailbox.push(message);
+    }
+
     /// Get the mailbox for the given component.
     pub fn mailbox<C: Component<Message = Message> + ?Sized>(
         &mut self,
         component: &C,
     ) -> Option<&mut Mailbox<C>> {
         self.boxes.get_mut(&component.key())
+    }
+
+    /// Get the UI message queue.
+    pub(crate) fn ui_mailbox(&self) -> &Vec<UiControlMessage> {
+        &self.ui_mailbox
+    }
+
+    /// Clear the UI message queue.
+    pub(crate) fn clear_ui_mailbox(&mut self) {
+        self.ui_mailbox.clear();
     }
 }

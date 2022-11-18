@@ -8,7 +8,8 @@ use makeup_console::Keypress;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 
-use crate::{post_office::PostOffice, Coordinates, Dimensions, DrawCommand};
+use crate::post_office::PostOffice;
+use crate::{Coordinates, Dimensions, DrawCommand};
 
 /// A key that uniquely identifies a [`Component`].
 pub type Key = u64;
@@ -36,18 +37,31 @@ pub type ContextTx<M> = Arc<Mutex<UnboundedSender<(Key, M)>>>;
 /// The context for a component's update lifecycle.
 #[derive(Debug)]
 pub struct UpdateContext<'a, M: std::fmt::Debug + Send + Sync + Clone + 'a> {
+    /// The [`PostOffice`] used for receiving messages.
     pub post_office: &'a mut PostOffice<M>,
+    /// Used for sending messages.
     pub tx: ContextTx<RawComponentMessage<M>>,
+    /// The [`Key`] of the currently-focused component.
+    pub focus: Key,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RenderContext {
+    /// How long the previous frame took to render. May not be present.
     pub last_frame_time: Option<Duration>,
+    /// The number of the current frame. Will only ever increase.
     pub frame_counter: u128,
+    /// The last FPS value.
     pub fps: f64,
+    /// The last effective FPS value. Maybe be larger than `fps`, sometimes
+    /// significantly so.
     pub effective_fps: f64,
+    /// The coordinates of the cursor in the character grid.
     pub cursor: Coordinates,
+    /// The dimensions of the character grid.
     pub dimensions: Dimensions,
+    /// The [`Key`] of the currently-focused component.
+    pub focus: Key,
 }
 
 /// A default message that can be sent to a component. Contains a lot of the

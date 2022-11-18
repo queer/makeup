@@ -61,6 +61,7 @@ pub fn fake_render_ctx() -> component::RenderContext {
         effective_fps: 0f64,
         cursor: (0, 0),
         dimensions: (0, 0),
+        focus: 0,
     }
 }
 

@@ -15,6 +15,11 @@ use crate::post_office::PostOffice;
 use crate::util::RwLocked;
 use crate::{Ansi, Component, DisplayEraseMode, Renderer};
 
+#[derive(Debug, Clone)]
+pub enum UiControlMessage {
+    MoveFocus(Key),
+}
+
 /// A makeup UI. Generally used with [`crate::render::TerminalRenderer`].
 ///
 /// MUIs are supposed to be entirely async. Components are updated and rendered
@@ -103,13 +108,15 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
         };
         'render_loop: loop {
             let start = Instant::now();
-            let render_context = RenderContext {
+            let mut render_context = RenderContext {
                 last_frame_time,
                 frame_counter,
                 fps: last_fps,
                 effective_fps,
                 cursor,
                 dimensions,
+                // Default values, these are filled in by the inner render method.
+                focus: 0,
             };
 
             let mut pending_input = vec![];
@@ -133,7 +140,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
                 }
             }
 
-            if let Err(e) = self.render_frame(&pending_input, &render_context).await {
+            if let Err(e) = self.render_frame(&pending_input, &mut render_context).await {
                 // TODO: Handle gracefully
                 eprintln!("Error: {}", e);
                 break 'render_loop;
@@ -164,23 +171,28 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
     }
 
     pub async fn render_once(&'a self) -> Result<()> {
-        let ctx = RenderContext {
+        let mut ctx = RenderContext {
             last_frame_time: None,
             frame_counter: 0,
             fps: 0f64,
             effective_fps: 0f64,
             cursor: (0, 0),
             dimensions: (0, 0),
+            focus: 0,
         };
 
-        self.render_frame(&[], &ctx).await
+        self.render_frame(&[], &mut ctx).await
     }
 
     /// Apply any pending `Mailbox`es and render the current frame. Makes no
     /// guarantees about hitting a framerate target, but instead renders as
     /// fast as possible.
-    async fn render_frame(&'a self, pending_input: &[Keypress], ctx: &RenderContext) -> Result<()> {
-        let ui = self.ui.lock().await;
+    async fn render_frame(
+        &'a self,
+        pending_input: &[Keypress],
+        ctx: &mut RenderContext,
+    ) -> Result<()> {
+        let mut ui = self.ui.lock().await;
         let commands = ui.render(pending_input, ctx).await?;
 
         let mut renderer = self.renderer.write().await;
@@ -195,9 +207,27 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
         ui.send(key, message).await;
     }
 
-    /// Get a mutable referenced to the renderer.
-    pub fn renderer(&self) -> &RwLocked<&'a mut dyn Renderer> {
+    /// Send a makeup message to the given component.
+    pub async fn send_makeup(&self, key: Key, message: MakeupMessage) {
+        let ui = self.ui.lock().await;
+        ui.send_makeup(key, message).await;
+    }
+
+    /// Send a message to the UI.
+    pub async fn send_control(&self, message: UiControlMessage) {
+        let ui = self.ui.lock().await;
+        ui.send_control(message).await;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn renderer(&self) -> &RwLocked<&'a mut dyn Renderer> {
         &self.renderer
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn focus(&self) -> Key {
+        let ui = self.ui.lock().await;
+        ui.focus()
     }
 }
 
@@ -211,28 +241,49 @@ enum InputFrame {
 struct UI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
     root: Mutex<&'a mut dyn Component<Message = M>>,
     post_office: Arc<RwLocked<PostOffice<M>>>,
+    focus: Key,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
     /// Build a new `UI` from the given root component.
-    pub fn new(root: &'a mut dyn Component<Message = M>) -> Self {
+    pub(self) fn new(root: &'a mut dyn Component<Message = M>) -> Self {
+        let focus_key = root.key();
         Self {
             root: Mutex::new(root),
             post_office: Arc::new(RwLocked::new(PostOffice::new())),
+            focus: focus_key,
         }
     }
 
     /// Render the entire UI.
     // TODO: Graceful error handling...
-    pub async fn render(
-        &self,
+    pub(self) async fn render(
+        &mut self,
         pending_input: &[Keypress],
-        ctx: &RenderContext,
+        ctx: &mut RenderContext,
     ) -> Result<Vec<DrawCommandBatch>> {
         let mut post_office = self.post_office.write().await;
         let mut root = self.root.lock().await;
+
+        for message in post_office.ui_mailbox() {
+            match message {
+                UiControlMessage::MoveFocus(key) => {
+                    self.focus = *key;
+                }
+            }
+        }
+        post_office.clear_ui_mailbox();
+
         Self::mail_pending_input(pending_input, &mut post_office, root.key());
-        Self::update_recursive(*root, &mut post_office, self.post_office.clone()).await?;
+        Self::update_recursive(
+            *root,
+            &mut post_office,
+            self.focus,
+            self.post_office.clone(),
+        )
+        .await?;
+        // TODO: Figure out not needing to mutate the ctx
+        ctx.focus = self.focus;
         let draw_commands = root.render_pass(ctx).await?;
         Ok(draw_commands)
     }
@@ -251,6 +302,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
     async fn update_recursive(
         component: &mut dyn Component<Message = M>,
         post_office: &mut PostOffice<M>,
+        focus: Key,
         post_office_lock: Arc<RwLocked<PostOffice<M>>>,
     ) -> Result<()> {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -259,6 +311,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         let mut pending_update = UpdateContext {
             post_office: &mut *post_office,
             tx: sender.clone(),
+            focus,
         };
 
         (*component).update_pass(&mut pending_update).await?;
@@ -282,15 +335,26 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
     }
 
     #[allow(unused)]
-    pub async fn send(&self, key: Key, message: M) {
+    pub(self) async fn send(&self, key: Key, message: M) {
         let mut post_office = self.post_office.write().await;
         post_office.send(key, message);
     }
 
     #[allow(unused)]
-    pub async fn send_makeup(&self, key: Key, message: MakeupMessage) {
+    pub(self) async fn send_makeup(&self, key: Key, message: MakeupMessage) {
         let mut post_office = self.post_office.write().await;
         post_office.send_makeup(key, message);
+    }
+
+    #[allow(unused)]
+    pub(self) async fn send_control(&self, message: UiControlMessage) {
+        let mut post_office = self.post_office.write().await;
+        post_office.send_control(message);
+    }
+
+    #[cfg(test)]
+    pub(self) fn focus(&self) -> Key {
+        self.focus
     }
 }
 
@@ -299,7 +363,9 @@ mod tests {
     use crate::component::{
         DrawCommandBatch, ExtractMessageFromComponent, Key, RenderContext, UpdateContext,
     };
+    use crate::components::EchoText;
     use crate::render::MemoryRenderer;
+    use crate::ui::UiControlMessage;
     use crate::{Component, DrawCommand, MUI};
 
     use async_trait::async_trait;
@@ -387,6 +453,25 @@ mod tests {
             renderer.move_cursor(0, 0).await?;
             assert_eq!("pong!".to_string(), renderer.read_at_cursor(5).await?);
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_ui_messaging_works() -> Result<()> {
+        let mut root = EchoText::<String>::new("blep");
+        let key = root.key();
+
+        let mut renderer = MemoryRenderer::new(128, 128);
+        let ui = MUI::new(&mut root, &mut renderer);
+        ui.render_once().await?;
+
+        assert_eq!(key, ui.focus().await);
+
+        ui.send_control(UiControlMessage::MoveFocus(0)).await;
+        ui.render_once().await?;
+
+        assert_eq!(0, ui.focus().await);
 
         Ok(())
     }

@@ -153,6 +153,7 @@ mod tests {
         root.update_pass(&mut UpdateContext {
             post_office: &mut post_office,
             tx: std::sync::Arc::new(tokio::sync::Mutex::new(tx)),
+            focus: root.key(),
         })
         .await?;
 

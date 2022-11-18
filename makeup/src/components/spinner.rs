@@ -147,6 +147,7 @@ mod tests {
         let mut ctx = UpdateContext {
             post_office: &mut post_office,
             tx: sender.clone(),
+            focus: root.key(),
         };
         root.update_pass(&mut ctx).await?;
 
@@ -167,6 +168,7 @@ mod tests {
         let mut ctx = UpdateContext {
             post_office: &mut post_office,
             tx: sender.clone(),
+            focus: root.key(),
         };
         root.update_pass(&mut ctx).await?;
 
@@ -187,6 +189,7 @@ mod tests {
         let mut ctx = UpdateContext {
             post_office: &mut post_office,
             tx: sender.clone(),
+            focus: root.key(),
         };
         root.update_pass(&mut ctx).await?;
 
