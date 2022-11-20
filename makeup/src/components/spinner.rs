@@ -83,6 +83,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
             }
             mailbox.clear();
         }
+
         Ok(())
     }
 

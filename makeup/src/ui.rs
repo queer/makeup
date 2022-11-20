@@ -242,16 +242,19 @@ struct UI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
     root: Mutex<&'a mut dyn Component<Message = M>>,
     post_office: Arc<RwLocked<PostOffice<M>>>,
     focus: Key,
+    components: Vec<Key>,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
     /// Build a new `UI` from the given root component.
     pub(self) fn new(root: &'a mut dyn Component<Message = M>) -> Self {
         let focus_key = root.key();
+        let components = Self::extract_ordered_keys(root);
         Self {
             root: Mutex::new(root),
             post_office: Arc::new(RwLocked::new(PostOffice::new())),
             focus: focus_key,
+            components,
         }
     }
 
@@ -282,10 +285,42 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
             self.post_office.clone(),
         )
         .await?;
+
+        let render_tree = Self::extract_ordered_keys(*root);
+        let mut added = vec![];
+        let mut removed = vec![];
+
+        for key in render_tree.iter() {
+            if !self.components.contains(key) {
+                added.push(*key);
+            }
+        }
+        for key in self.components.iter() {
+            if !render_tree.contains(key) {
+                removed.push(*key);
+            }
+        }
+
+        self.components.clear();
+        self.components.extend(render_tree);
+
         // TODO: Figure out not needing to mutate the ctx
         ctx.focus = self.focus;
         let draw_commands = root.render_pass(ctx).await?;
         Ok(draw_commands)
+    }
+
+    fn extract_ordered_keys(component: &dyn Component<Message = M>) -> Vec<Key> {
+        let mut out = vec![];
+        out.push(component.key());
+
+        if let Some(children) = component.children() {
+            for child in children {
+                out.extend(Self::extract_ordered_keys(child));
+            }
+        }
+
+        out
     }
 
     fn mail_pending_input(
