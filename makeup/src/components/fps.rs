@@ -41,8 +41,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> 
     }
 
     async fn render(&self, ctx: &RenderContext) -> Result<DrawCommandBatch> {
-        Ok((
-            self.key,
+        self.batch(
             vec![DrawCommand::TextUnderCursor(format!(
                 "FPS: {:.2} (effective: {:.2}), dimensions: ({}, {}), cursor (when this render started): ({}, {}), last frame: {}ms, frame: {}",
                 ctx.fps,
@@ -54,7 +53,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> 
                 ctx.last_frame_time.map(|d| d.as_millis()).unwrap_or(0),
                 ctx.frame_counter
             ))],
-        ))
+        )
     }
 
     async fn update_pass(

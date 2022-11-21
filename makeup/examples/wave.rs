@@ -132,7 +132,7 @@ impl Component for Wave {
             ctx.fps, ctx.effective_fps, ctx.dimensions
         )));
 
-        Ok((self.key, commands))
+        self.batch(commands)
     }
 
     async fn update_pass(

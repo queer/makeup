@@ -88,14 +88,11 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
     }
 
     async fn render(&self, _ctx: &RenderContext) -> Result<DrawCommandBatch> {
-        Ok((
-            self.key,
-            vec![
-                DrawCommand::CharUnderCursor(self.spin_steps[self.step]),
-                DrawCommand::CharUnderCursor(' '),
-                DrawCommand::TextUnderCursor(self.text.clone()),
-            ],
-        ))
+        self.batch(vec![
+            DrawCommand::CharUnderCursor(self.spin_steps[self.step]),
+            DrawCommand::CharUnderCursor(' '),
+            DrawCommand::TextUnderCursor(self.text.clone()),
+        ])
     }
 
     async fn update_pass(

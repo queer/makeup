@@ -64,14 +64,11 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedTex
     }
 
     async fn render(&self, _ctx: &RenderContext) -> Result<DrawCommandBatch> {
-        Ok((
-            self.key,
-            vec![DrawCommand::TextAt {
-                text: self.text.clone(),
-                x: self.x,
-                y: self.y,
-            }],
-        ))
+        self.batch(vec![DrawCommand::TextAt {
+            text: self.text.clone(),
+            x: self.x,
+            y: self.y,
+        }])
     }
 
     async fn update_pass(

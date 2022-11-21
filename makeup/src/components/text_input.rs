@@ -81,27 +81,21 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
         match self.input_offset {
             Some(offset) if offset < 0 => {
                 // If we have a negative offset, erase to the end of the line.
-                Ok((
-                    self.key,
-                    vec![
-                        DrawCommand::TextUnderCursor(self.prompt.clone()),
-                        DrawCommand::CharUnderCursor(':'),
-                        DrawCommand::CharUnderCursor(' '),
-                        DrawCommand::TextUnderCursor(self.buffer.clone()),
-                        // TODO: This should probably just replace the characters with whitespace...
-                        DrawCommand::EraseCurrentLine(LineEraseMode::FromCursorToEnd),
-                    ],
-                ))
-            }
-            _ => Ok((
-                self.key,
-                vec![
+                self.batch(vec![
                     DrawCommand::TextUnderCursor(self.prompt.clone()),
                     DrawCommand::CharUnderCursor(':'),
                     DrawCommand::CharUnderCursor(' '),
                     DrawCommand::TextUnderCursor(self.buffer.clone()),
-                ],
-            )),
+                    // TODO: This should probably just replace the characters with whitespace...
+                    DrawCommand::EraseCurrentLine(LineEraseMode::FromCursorToEnd),
+                ])
+            }
+            _ => self.batch(vec![
+                DrawCommand::TextUnderCursor(self.prompt.clone()),
+                DrawCommand::CharUnderCursor(':'),
+                DrawCommand::CharUnderCursor(' '),
+                DrawCommand::TextUnderCursor(self.buffer.clone()),
+            ]),
         }
     }
 

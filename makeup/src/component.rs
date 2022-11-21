@@ -110,6 +110,11 @@ pub trait Component: std::fmt::Debug + Send + Sync {
 
     /// A unique key for this component. See [`generate_key`].
     fn key(&self) -> Key;
+
+    /// Batch the given render commands with this component's key.
+    fn batch(&self, commands: Vec<DrawCommand>) -> Result<DrawCommandBatch> {
+        Ok((self.key(), commands))
+    }
 }
 
 /// Generate a most-likely-unique key for a component.
