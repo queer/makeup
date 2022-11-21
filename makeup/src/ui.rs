@@ -11,9 +11,10 @@ use tokio::sync::Mutex;
 use tokio::time::Instant;
 
 use crate::component::{DrawCommandBatch, Key, MakeupMessage, RenderContext, UpdateContext};
+use crate::input::{InputFrame, TerminalInput};
 use crate::post_office::PostOffice;
 use crate::util::RwLocked;
-use crate::{Ansi, Component, DisplayEraseMode, Renderer};
+use crate::{Ansi, Component, DisplayEraseMode, Input, Renderer};
 
 #[derive(Debug, Clone)]
 pub enum UiControlMessage {
@@ -27,16 +28,25 @@ pub enum UiControlMessage {
 /// runtime's executor pool via [`tokio::spawn`] or equivalent, and then send
 /// messages back to the UI via the [`PostOffice`].
 #[derive(Debug)]
-pub struct MUI<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> {
+pub struct MUI<
+    'a,
+    M: std::fmt::Debug + Send + Sync + Clone + 'static,
+    I: Input + 'static = TerminalInput,
+> {
     ui: Arc<Mutex<UI<'a, M>>>,
     renderer: RwLocked<&'a mut dyn Renderer>,
     input_tx: Arc<Mutex<UnboundedSender<InputFrame>>>,
     input_rx: Arc<Mutex<UnboundedReceiver<InputFrame>>>,
+    input: I,
 }
 
-impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
+impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M, I> {
     /// Create a new makeup UI with the given root component and renderer.
-    pub fn new(root: &'a mut dyn Component<Message = M>, renderer: &'a mut dyn Renderer) -> Self {
+    pub fn new(
+        root: &'a mut dyn Component<Message = M>,
+        renderer: &'a mut dyn Renderer,
+        input: I,
+    ) -> Self {
         let (input_tx, input_rx) = tokio::sync::mpsc::unbounded_channel();
 
         Self {
@@ -44,6 +54,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
             renderer: RwLocked::new(renderer),
             input_tx: Arc::new(Mutex::new(input_tx)),
             input_rx: Arc::new(Mutex::new(input_rx)),
+            input,
         }
     }
 
@@ -64,36 +75,6 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
             print!("{}", Ansi::EraseInDisplay(DisplayEraseMode::All));
         }
 
-        let input_tx_lock = self.input_tx.clone();
-        tokio::spawn(async move {
-            loop {
-                let tx = input_tx_lock.lock().await;
-                match makeup_console::next_keypress().await {
-                    Ok(key) => {
-                        tx.send(InputFrame::Frame(key)).unwrap();
-                    }
-                    Err(e) => {
-                        if let Some(err) = e.chain().next() {
-                            match err.downcast_ref() {
-                                Some(makeup_console::ConsoleError::Io(e)) => {
-                                    if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                                        tx.send(InputFrame::End).unwrap();
-                                        break;
-                                    }
-                                }
-                                Some(makeup_console::ConsoleError::Interrupted) => {
-                                    tx.send(InputFrame::End).unwrap();
-                                    break;
-                                }
-                                _ => {}
-                            }
-                        }
-                        eprintln!("Error: {}", e);
-                    }
-                }
-            }
-        });
-
         let fps_target = 60;
         let one_second_in_micros = Duration::from_secs(1).as_micros();
         let frame_target = Duration::from_micros((one_second_in_micros as u64) / fps_target);
@@ -106,8 +87,29 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
 
             (renderer.cursor(), renderer.dimensions())
         };
+
+        let input = self.input.clone();
+        let input_tx = self.input_tx.clone();
+        tokio::spawn(async move {
+            loop {
+                let input_tx = input_tx.lock().await;
+                let frame = input.next_frame().await.unwrap();
+                let mut done = false;
+                if frame == InputFrame::End {
+                    done = true;
+                }
+                if let Err(_e) = input_tx.send(frame) {
+                    break;
+                }
+                if done {
+                    break;
+                }
+            }
+        });
+
         'render_loop: loop {
             let start = Instant::now();
+
             let mut render_context = RenderContext {
                 last_frame_time,
                 frame_counter,
@@ -228,12 +230,6 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
         let ui = self.ui.lock().await;
         ui.focus()
     }
-}
-
-#[derive(Debug, Clone)]
-enum InputFrame {
-    Frame(Keypress),
-    End,
 }
 
 #[derive(Debug)]
@@ -398,6 +394,7 @@ mod tests {
         DrawCommandBatch, ExtractMessageFromComponent, Key, RenderContext, UpdateContext,
     };
     use crate::components::EchoText;
+    use crate::input::TerminalInput;
     use crate::render::MemoryRenderer;
     use crate::ui::UiControlMessage;
     use crate::{Component, DrawCommand, MUI};
@@ -482,7 +479,8 @@ mod tests {
         let key = root.key();
 
         let mut renderer = MemoryRenderer::new(128, 128);
-        let ui = MUI::new(&mut root, &mut renderer);
+        let input = TerminalInput::new();
+        let ui = MUI::new(&mut root, &mut renderer, input);
         ui.render_once().await?;
 
         {
@@ -509,7 +507,8 @@ mod tests {
         let key = root.key();
 
         let mut renderer = MemoryRenderer::new(128, 128);
-        let ui = MUI::new(&mut root, &mut renderer);
+        let input = TerminalInput::new();
+        let ui = MUI::new(&mut root, &mut renderer, input);
         ui.render_once().await?;
 
         assert_eq!(key, ui.focus().await);

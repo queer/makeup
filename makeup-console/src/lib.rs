@@ -196,7 +196,7 @@ fn char_from_utf8(buf: &[u8]) -> Result<char> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Keypress {
     Up,
     Down,

@@ -1,4 +1,5 @@
 use makeup::components::TextInput;
+use makeup::input::TerminalInput;
 use makeup::render::terminal::TerminalRenderer;
 use makeup::MUI;
 
@@ -8,7 +9,8 @@ use eyre::Result;
 async fn main() -> Result<()> {
     let mut root = TextInput::new("Type some text here");
     let mut renderer = TerminalRenderer::new();
-    let mui = MUI::<()>::new(&mut root, &mut renderer);
+    let input = TerminalInput::new();
+    let mui = MUI::<()>::new(&mut root, &mut renderer, input);
     mui.render(false).await?;
 
     Ok(())

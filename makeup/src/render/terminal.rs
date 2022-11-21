@@ -1,6 +1,7 @@
+use std::io::Write;
+
 use async_trait::async_trait;
 use eyre::Result;
-use tokio::io::AsyncWriteExt;
 
 use crate::component::DrawCommandBatch;
 use crate::{Ansi, DrawCommand};
@@ -88,13 +89,9 @@ impl Renderer for TerminalRenderer {
             }
         }
 
-        tokio::io::stdout().write_all(buffer.as_bytes()).await?;
-        tokio::io::stdout().flush().await?;
-
-        // print!("{}", buffer);
-
         // NOTE: Can't flush with tokio, doesn't work for some reason.
-        // std::io::stdout().flush()?;
+        print!("{}", buffer);
+        std::io::stdout().flush()?;
 
         Ok(())
     }

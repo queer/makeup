@@ -51,16 +51,18 @@ pub enum RenderError {
 mod tests {
     use super::MemoryRenderer;
     use crate::components::EchoText;
+    use crate::input::TerminalInput;
     use crate::{Renderer, MUI};
 
     use eyre::Result;
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
-        let mut root = EchoText::new("henol world");
+        let mut root = EchoText::<()>::new("henol world");
 
         let mut renderer = MemoryRenderer::new(128, 128);
-        let ui = MUI::<()>::new(&mut root, &mut renderer);
+        let input = TerminalInput::new();
+        let ui = MUI::new(&mut root, &mut renderer, input);
         ui.render_once().await?;
 
         renderer.move_cursor(0, 0).await?;

@@ -93,6 +93,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedTex
 #[cfg(test)]
 mod tests {
     use crate::components::PositionedText;
+    use crate::input::TerminalInput;
     use crate::render::MemoryRenderer;
     use crate::{Renderer, MUI};
 
@@ -100,10 +101,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
-        let mut root = PositionedText::new("henol world", 1, 1);
+        let mut root = PositionedText::<()>::new("henol world", 1, 1);
 
         let mut renderer = MemoryRenderer::new(128, 128);
-        let ui = MUI::<&'static str>::new(&mut root, &mut renderer);
+        let input = TerminalInput::new();
+        let ui = MUI::new(&mut root, &mut renderer, input);
         ui.render_once().await?;
 
         renderer.move_cursor(0, 0).await?;

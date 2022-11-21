@@ -5,14 +5,18 @@
     rustdoc::private_intra_doc_links
 )]
 #![deny(clippy::perf, clippy::complexity, clippy::cargo)]
+#![allow(clippy::new_without_default)]
+
 pub mod component;
 pub mod components;
+pub mod input;
 pub mod post_office;
 pub mod render;
 pub mod ui;
 pub mod util;
 
 pub use component::Component;
+pub use input::Input;
 pub use render::Renderer;
 pub use ui::MUI;
 
@@ -77,6 +81,7 @@ mod tests {
         DrawCommandBatch, ExtractMessageFromComponent, Key, RenderContext, UpdateContext,
     };
     use crate::components::EchoText;
+    use crate::input::TerminalInput;
     use crate::render::MemoryRenderer;
     use crate::util::RwLocked;
     use crate::{Component, DrawCommand, Renderer, MUI};
@@ -149,7 +154,8 @@ mod tests {
         };
 
         let mut renderer = MemoryRenderer::new(128, 128);
-        let ui = MUI::new(&mut root, &mut renderer);
+        let input = TerminalInput::new();
+        let ui = MUI::new(&mut root, &mut renderer, input);
         ui.render_once().await?;
         let expected = "henol world".to_string();
         ui.render_once().await?;
@@ -173,7 +179,8 @@ mod tests {
         };
 
         let mut renderer = MemoryRenderer::new(128, 128);
-        let ui = MUI::new(&mut root, &mut renderer);
+        let input = TerminalInput::new();
+        let ui = MUI::new(&mut root, &mut renderer, input);
         ui.render_once().await?;
 
         let expected = "henol world? wrong! banana".to_string();

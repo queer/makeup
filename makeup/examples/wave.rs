@@ -6,6 +6,7 @@ use either::Either;
 use makeup::component::{
     DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
 };
+use makeup::input::TerminalInput;
 use makeup::render::terminal::TerminalRenderer;
 use makeup::{Ansi, Component, DrawCommand, LineEraseMode, SgrParameter, MUI};
 
@@ -20,7 +21,8 @@ async fn main() -> Result<()> {
         .build()?;
     let mut root = Wave::new(gradient);
     let mut renderer = TerminalRenderer::new();
-    let mui = MUI::<()>::new(&mut root, &mut renderer);
+    let input = TerminalInput::new();
+    let mui = MUI::new(&mut root, &mut renderer, input);
     mui.render(false).await?;
 
     Ok(())
