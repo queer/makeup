@@ -156,7 +156,6 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone> MUI<'a, M> {
                 effective_fps
             };
 
-            // TODO: This fucks input doesn't it?
             if let Some(duration) = frame_target.checked_sub(elapsed) {
                 tokio::time::sleep(duration).await
             } else {
