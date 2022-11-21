@@ -3,9 +3,9 @@ name = "makeup-ansi"
 description = "ANSI helper library for makeup"
 repository = "https://github.com/queer/makeup"
 license = "MIT"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
-categories = ["Command-line interface"]
+categories = ["command-line-interface"]
 keywords = ["ansi"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

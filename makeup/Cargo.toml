@@ -3,10 +3,10 @@ name = "makeup"
 description = "Stylish CLIs/TUIs for Rust!"
 repository = "https://github.com/queer/makeup"
 license = "MIT"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 readme = "../README.md"
-categories = ["Command-line interface", "Rendering"]
+categories = ["command-line-interface", "rendering", "rendering::engine"]
 keywords = ["cli", "tui", "terminal", "color", "60fps"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -28,8 +28,8 @@ colorgrad = "0.6.2"
 
 [dependencies.makeup-ansi]
 path = "../makeup-ansi"
-version = "0.0.1"
+version = "0.0.2"
 
 [dependencies.makeup-console]
 path = "../makeup-console"
-version = "0.0.2"
+version = "0.0.3"

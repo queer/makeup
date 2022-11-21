@@ -3,9 +3,9 @@ name = "makeup-console"
 description = "Console helper library for makeup"
 repository = "https://github.com/queer/makeup"
 license = "MIT"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
-categories = ["Command-line interface"]
+categories = ["command-line-interface"]
 keywords = ["console"]
 
 [dependencies]
@@ -18,4 +18,4 @@ thiserror = "1.0.37"
 
 [dependencies.makeup-ansi]
 path = "../makeup-ansi"
-version = "0.0.1"
+version = "0.0.2"
