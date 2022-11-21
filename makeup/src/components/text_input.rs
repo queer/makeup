@@ -118,7 +118,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
 #[cfg(test)]
 mod tests {
     use super::TextInput;
-    use crate::component::UpdateContext;
+    use crate::component::{MessageSender, UpdateContext};
     use crate::post_office::PostOffice;
     use crate::{Component, DrawCommand};
 
@@ -150,7 +150,7 @@ mod tests {
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
         root.update_pass(&mut UpdateContext {
             post_office: &mut post_office,
-            tx: std::sync::Arc::new(tokio::sync::Mutex::new(tx)),
+            sender: MessageSender::new(tx.clone(), root.key()),
             focus: root.key(),
         })
         .await?;

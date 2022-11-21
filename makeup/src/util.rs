@@ -48,10 +48,3 @@ impl<T: std::any::Any> AsAny for T {
         self
     }
 }
-
-#[derive(Debug)]
-pub enum Triple<A: std::fmt::Debug, B: std::fmt::Debug, C: std::fmt::Debug> {
-    Left(A),
-    Middle(B),
-    Right(C),
-}

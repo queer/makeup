@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -6,7 +5,6 @@ use either::Either;
 use eyre::Result;
 use makeup_console::Keypress;
 use tokio::sync::mpsc::UnboundedSender;
-use tokio::sync::Mutex;
 
 use crate::post_office::PostOffice;
 use crate::{Coordinates, Dimensions, DrawCommand};
@@ -32,17 +30,107 @@ pub type Mailbox<C> = Vec<ComponentMessage<C>>;
 
 /// An [`UnboundedSender`] that can be used to send messages to a component
 /// during the [`Component::update_pass`] loop.
-pub type ContextTx<M> = Arc<Mutex<UnboundedSender<(Key, M)>>>;
+pub type ContextTx<M> = UnboundedSender<(Key, RawComponentMessage<M>)>;
 
 /// The context for a component's update lifecycle.
 #[derive(Debug)]
-pub struct UpdateContext<'a, M: std::fmt::Debug + Send + Sync + Clone + 'a> {
+pub struct UpdateContext<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> {
     /// The [`PostOffice`] used for receiving messages.
     pub post_office: &'a mut PostOffice<M>,
     /// Used for sending messages.
-    pub tx: ContextTx<RawComponentMessage<M>>,
+    pub sender: MessageSender<M>,
     /// The [`Key`] of the currently-focused component.
     pub focus: Key,
+}
+
+impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UpdateContext<'a, M> {
+    pub fn new(post_office: &'a mut PostOffice<M>, sender: ContextTx<M>, focus: Key) -> Self {
+        Self {
+            post_office,
+            sender: MessageSender::new(sender, focus),
+            focus,
+        }
+    }
+
+    pub fn sender(&self) -> MessageSender<M> {
+        self.sender.clone()
+    }
+}
+
+/// A helper for components to use for message-sending during the update loop.
+#[derive(Debug, Clone)]
+pub struct MessageSender<M: std::fmt::Debug + Send + Sync + Clone + 'static> {
+    focus: Key,
+    tx: ContextTx<M>,
+}
+
+impl<M: std::fmt::Debug + Send + Sync + Clone + 'static> MessageSender<M> {
+    pub fn new(tx: ContextTx<M>, focus: Key) -> Self {
+        Self { tx, focus }
+    }
+
+    /// Send a message to the given component.
+    pub fn send_message(&self, key: Key, msg: M) -> Result<()> {
+        let sender = self.tx.clone();
+        tokio::spawn(async move {
+            sender.send((key, Either::Left(msg))).unwrap();
+        });
+        Ok(())
+    }
+
+    /// Send a [`MakeupMessage`] to the given component.
+    pub fn send_makeup_message(&self, key: Key, msg: MakeupMessage) -> Result<()> {
+        let sender = self.tx.clone();
+        tokio::spawn(async move {
+            sender.send((key, Either::Right(msg))).unwrap();
+        });
+        Ok(())
+    }
+
+    /// Send a message to given component after waiting for the given duration.
+    pub fn send_message_after(&self, key: Key, msg: M, duration: Duration) -> Result<()> {
+        let sender = self.tx.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(duration).await;
+            sender.send((key, Either::Left(msg))).unwrap();
+        });
+        Ok(())
+    }
+
+    /// Send a [`MakeupMessage`] to the given component after waiting for the
+    pub fn send_makeup_message_after(
+        &self,
+        key: Key,
+        msg: MakeupMessage,
+        duration: Duration,
+    ) -> Result<()> {
+        let sender = self.tx.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(duration).await;
+            sender.send((key, Either::Right(msg))).unwrap();
+        });
+        Ok(())
+    }
+
+    pub fn send_message_to_focused(&self, msg: M) -> Result<()> {
+        self.send_message(self.focus, msg)
+    }
+
+    pub fn send_makeup_message_to_focused(&self, msg: MakeupMessage) -> Result<()> {
+        self.send_makeup_message(self.focus, msg)
+    }
+
+    pub fn send_message_to_focused_after(&self, msg: M, duration: Duration) -> Result<()> {
+        self.send_message_after(self.focus, msg, duration)
+    }
+
+    pub fn send_makeup_message_to_focused_after(
+        &self,
+        msg: MakeupMessage,
+        duration: Duration,
+    ) -> Result<()> {
+        self.send_makeup_message_after(self.focus, msg, duration)
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -8,7 +8,7 @@ use eyre::Result;
 use crate::component::{
     DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
 };
-use crate::{Component, DrawCommand};
+use crate::{check_mail, Component, DrawCommand};
 
 /// A simple component that renders a spinner with the given text.
 #[derive(Debug)]
@@ -49,40 +49,24 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
         ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
     ) -> Result<()> {
         if !self.started {
+            ctx.sender
+                .send_makeup_message(self.key(), MakeupMessage::TimerTick(self.interval))?;
             self.started = true;
-            let sender = ctx.tx.clone();
-            let sender = sender.lock().await;
-            let key = self.key();
-            sender.send((key, Either::Right(MakeupMessage::TimerTick(self.interval))))?;
         }
 
-        if let Some(mailbox) = ctx.post_office.mailbox(self) {
-            for msg in mailbox.iter() {
-                match msg {
-                    Either::Left(_msg) => {
-                        // log::debug!("Spinner received message: {:?}", msg);
-                    }
-                    #[allow(clippy::single_match)]
-                    Either::Right(msg) => match msg {
-                        MakeupMessage::TimerTick(_) => {
-                            self.step = (self.step + 1) % self.spin_steps.len();
-                            let key = self.key();
-                            let sender = ctx.tx.clone();
-                            let interval = self.interval;
-                            tokio::spawn(async move {
-                                tokio::time::sleep(interval).await;
-                                let sender = sender.lock().await;
-                                sender
-                                    .send((key, Either::Right(MakeupMessage::TimerTick(interval))))
-                                    .unwrap();
-                            });
-                        }
-                        _ => {}
-                    },
+        check_mail!(self, ctx, {
+            _ => {},
+            makeup_message => {
+                if let MakeupMessage::TimerTick(_) = makeup_message {
+                    self.step = (self.step + 1) % self.spin_steps.len();
+                    ctx.sender.send_makeup_message_after(
+                        self.key(),
+                        MakeupMessage::TimerTick(self.interval),
+                        self.interval,
+                    )?;
                 }
             }
-            mailbox.clear();
-        }
+        });
 
         Ok(())
     }
@@ -113,16 +97,14 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use std::time::Duration;
 
     use super::Spinner;
-    use crate::component::{MakeupMessage, UpdateContext};
+    use crate::component::{MakeupMessage, MessageSender, UpdateContext};
     use crate::post_office::PostOffice;
     use crate::{Component, DrawCommand};
 
     use eyre::Result;
-    use tokio::sync::Mutex;
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
@@ -130,7 +112,6 @@ mod tests {
         let mut root = Spinner::<()>::new("henol world", vec!['-', '\\', '|', '/'], interval);
         let mut post_office = PostOffice::<()>::new();
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
-        let sender = Arc::new(Mutex::new(tx));
 
         let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
         assert_eq!(
@@ -148,7 +129,7 @@ mod tests {
 
         let mut ctx = UpdateContext {
             post_office: &mut post_office,
-            tx: sender.clone(),
+            sender: MessageSender::new(tx.clone(), root.key()),
             focus: root.key(),
         };
         root.update_pass(&mut ctx).await?;
@@ -169,7 +150,7 @@ mod tests {
 
         let mut ctx = UpdateContext {
             post_office: &mut post_office,
-            tx: sender.clone(),
+            sender: MessageSender::new(tx.clone(), root.key()),
             focus: root.key(),
         };
         root.update_pass(&mut ctx).await?;
@@ -190,7 +171,7 @@ mod tests {
 
         let mut ctx = UpdateContext {
             post_office: &mut post_office,
-            tx: sender.clone(),
+            sender: MessageSender::new(tx.clone(), root.key()),
             focus: root.key(),
         };
         root.update_pass(&mut ctx).await?;

@@ -10,7 +10,9 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 
-use crate::component::{DrawCommandBatch, Key, MakeupMessage, RenderContext, UpdateContext};
+use crate::component::{
+    DrawCommandBatch, Key, MakeupMessage, MessageSender, RenderContext, UpdateContext,
+};
 use crate::input::{InputFrame, TerminalInput};
 use crate::post_office::PostOffice;
 use crate::util::RwLocked;
@@ -35,7 +37,7 @@ pub struct MUI<
 > {
     ui: Arc<Mutex<UI<'a, M>>>,
     renderer: RwLocked<&'a mut dyn Renderer>,
-    input_tx: Arc<Mutex<UnboundedSender<InputFrame>>>,
+    input_tx: UnboundedSender<InputFrame>,
     input_rx: Arc<Mutex<UnboundedReceiver<InputFrame>>>,
     input: I,
 }
@@ -52,7 +54,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
         Self {
             ui: Arc::new(Mutex::new(UI::new(root))),
             renderer: RwLocked::new(renderer),
-            input_tx: Arc::new(Mutex::new(input_tx)),
+            input_tx,
             input_rx: Arc::new(Mutex::new(input_rx)),
             input,
         }
@@ -88,24 +90,27 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
             (renderer.cursor(), renderer.dimensions())
         };
 
-        let input = self.input.clone();
-        let input_tx = self.input_tx.clone();
-        tokio::spawn(async move {
-            loop {
-                let input_tx = input_tx.lock().await;
-                let frame = input.next_frame().await.unwrap();
-                let mut done = false;
-                if frame == InputFrame::End {
-                    done = true;
+        // Input setup.
+        // Don't want the clones escaping this scope.
+        {
+            let input = self.input.clone();
+            let input_tx = self.input_tx.clone();
+            tokio::spawn(async move {
+                loop {
+                    let frame = input.next_frame().await.unwrap();
+                    let mut done = false;
+                    if frame == InputFrame::End {
+                        done = true;
+                    }
+                    if let Err(_e) = input_tx.send(frame) {
+                        break;
+                    }
+                    if done {
+                        break;
+                    }
                 }
-                if let Err(_e) = input_tx.send(frame) {
-                    break;
-                }
-                if done {
-                    break;
-                }
-            }
-        });
+            });
+        }
 
         'render_loop: loop {
             let start = Instant::now();
@@ -336,11 +341,10 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         post_office_lock: Arc<RwLocked<PostOffice<M>>>,
     ) -> Result<()> {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        let sender = Arc::new(Mutex::new(tx));
 
         let mut pending_update = UpdateContext {
             post_office: &mut *post_office,
-            tx: sender.clone(),
+            sender: MessageSender::new(tx.clone(), focus),
             focus,
         };
 

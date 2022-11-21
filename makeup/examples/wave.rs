@@ -61,12 +61,10 @@ impl Component for Wave {
         &mut self,
         ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
     ) -> Result<()> {
+        let sender = ctx.sender.clone();
         if !self.started {
             self.started = true;
-            let sender = ctx.tx.clone();
-            let sender = sender.lock().await;
-            let key = self.key();
-            sender.send((key, Either::Right(MakeupMessage::TimerTick(DURATION))))?;
+            sender.send_makeup_message(self.key(), MakeupMessage::TimerTick(DURATION))?;
         }
 
         if let Some(mailbox) = ctx.post_office.mailbox(self) {
@@ -80,12 +78,12 @@ impl Component for Wave {
                         MakeupMessage::TimerTick(_) => {
                             self.step = (self.step + 1) % 10;
                             let key = self.key();
-                            let sender = ctx.tx.clone();
+                            let sender = ctx.sender.clone();
+
                             tokio::spawn(async move {
                                 tokio::time::sleep(DURATION).await;
-                                let sender = sender.lock().await;
                                 sender
-                                    .send((key, Either::Right(MakeupMessage::TimerTick(DURATION))))
+                                    .send_makeup_message(key, MakeupMessage::TimerTick(DURATION))
                                     .unwrap();
                             });
                         }

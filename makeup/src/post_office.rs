@@ -63,3 +63,30 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
         self.ui_mailbox.clear();
     }
 }
+
+/// Check the mail for the current component. Clears mailboxes after reading.
+#[macro_export]
+macro_rules! check_mail {
+    ( $component:expr, $ctx:expr, $external:pat_param => $external_handler:block ) => {
+        if let Some(mailbox) = $ctx.post_office.mailbox($component) {
+            for message in mailbox.iter() {
+                match message {
+                    Either::Left($external) => $external_handler,
+                    Either::Right(_) => {}
+                }
+            }
+        }
+    };
+
+    ( $component:expr, $ctx:expr, { $external:pat_param => $external_handler:block, $internal:pat_param => $internal_handler:block } ) => {
+        if let Some(mailbox) = $ctx.post_office.mailbox($component) {
+            for message in mailbox.iter() {
+                match message {
+                    Either::Left($external) => $external_handler,
+                    Either::Right($internal) => $internal_handler,
+                }
+            }
+            mailbox.clear();
+        }
+    };
+}
