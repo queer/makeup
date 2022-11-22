@@ -47,7 +47,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
     ) -> Result<()> {
         let mut offset = 0i32;
         check_mail!(self, ctx, {
-            MakeupMessage = msg => {
+            msg if MakeupMessage => {
                 match msg {
                     MakeupMessage::Keypress(Keypress::Char(c)) => {
                         self.buffer.push(*c);

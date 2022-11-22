@@ -65,15 +65,35 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
 }
 
 /// Check the mail for the current component. Clears mailboxes after reading.
+///
+/// Example:
+///
+/// ```ignore
+/// use makeup::check_mail;
+///
+/// check_mail!(self, ctx, {
+///     msg if MakeupMessage => {
+///         if let MakeupMessage::TextUpdate(text) = msg {
+///             self.text = text.clone();
+///         }
+///     }
+//
+///     msg => {
+///         // Handle your custom message here!
+///     }
+/// });
+/// ```
 #[macro_export]
 macro_rules! check_mail {
-    ( $component:expr, $ctx:expr, { $( $kind:path = $pat:pat_param => $handler:block )+ } ) => {
+    ( $component:expr, $ctx:expr, { $( $message_pattern:pat $( if $kind:ty )? => $handler:block )+ } ) => {
         {
             use $crate::build_message_pattern;
             if let Some(mailbox) = $ctx.post_office.mailbox($component) {
                 for message in mailbox.iter() {
                     match message {
-                        build_message_pattern!( $( $kind = $pat )+ ) => $( $handler )+,
+                        build_message_pattern!( $( $message_pattern $( if $kind )? )+ ) => {
+                            $( $handler )+
+                        }
                         _ => {},
                     }
                 }
@@ -85,11 +105,11 @@ macro_rules! check_mail {
 
 #[macro_export]
 macro_rules! build_message_pattern {
-    ( $_:ty = $pat:pat_param ) => {
+    ( $pat:pat if $kind:ty ) => {
         Either::Right($pat)
     };
 
-    ( $pat:pat_param ) => {
+    ( $pat:pat ) => {
         Either::Left($pat)
     };
 }
