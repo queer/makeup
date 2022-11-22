@@ -75,7 +75,8 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
 ///     msg => {
 ///         // Handle your custom message here!
 ///     }
-///     // Indicate that all following handlers are for makeup messages. Must be specified even if there are no handlers.
+///     // Indicate that all following handlers are for makeup messages.
+///     // Must be specified even if there are no handlers.
 ///     'makeup:
 ///     msg if MakeupMessage => {
 ///         if let MakeupMessage::TextUpdate(text) = msg {
