@@ -8,7 +8,7 @@ use makeup::component::{
 };
 use makeup::input::TerminalInput;
 use makeup::render::terminal::TerminalRenderer;
-use makeup::{Ansi, Component, DrawCommand, LineEraseMode, SgrParameter, MUI};
+use makeup::{check_mail, Ansi, Component, DrawCommand, LineEraseMode, SgrParameter, MUI};
 
 use eyre::Result;
 
@@ -67,32 +67,14 @@ impl Component for Wave {
             sender.send_makeup_message(self.key(), MakeupMessage::TimerTick(DURATION))?;
         }
 
-        if let Some(mailbox) = ctx.post_office.mailbox(self) {
-            for msg in mailbox.iter() {
-                match msg {
-                    Either::Left(_msg) => {
-                        // log::debug!("Spinner received message: {:?}", msg);
-                    }
-                    #[allow(clippy::single_match)]
-                    Either::Right(msg) => match msg {
-                        MakeupMessage::TimerTick(_) => {
-                            self.step = (self.step + 1) % 10;
-                            let key = self.key();
-                            let sender = ctx.sender.clone();
-
-                            tokio::spawn(async move {
-                                tokio::time::sleep(DURATION).await;
-                                sender
-                                    .send_makeup_message(key, MakeupMessage::TimerTick(DURATION))
-                                    .unwrap();
-                            });
-                        }
-                        _ => {}
-                    },
+        check_mail!(self, ctx, {
+            MakeupMessage = msg => {
+                if let MakeupMessage::TimerTick(_) = msg {
+                    self.step = (self.step + 1) % 10;
+                    ctx.sender.send_makeup_message_after(self.key(), MakeupMessage::TimerTick(DURATION), DURATION)?;
                 }
             }
-            mailbox.clear();
-        }
+        });
 
         Ok(())
     }

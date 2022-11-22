@@ -67,26 +67,29 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
 /// Check the mail for the current component. Clears mailboxes after reading.
 #[macro_export]
 macro_rules! check_mail {
-    ( $component:expr, $ctx:expr, $external:pat_param => $external_handler:block ) => {
-        if let Some(mailbox) = $ctx.post_office.mailbox($component) {
-            for message in mailbox.iter() {
-                match message {
-                    Either::Left($external) => $external_handler,
-                    Either::Right(_) => {}
+    ( $component:expr, $ctx:expr, { $( $kind:path = $pat:pat_param => $handler:block )+ } ) => {
+        {
+            use $crate::build_message_pattern;
+            if let Some(mailbox) = $ctx.post_office.mailbox($component) {
+                for message in mailbox.iter() {
+                    match message {
+                        build_message_pattern!( $( $kind = $pat )+ ) => $( $handler )+,
+                        _ => {},
+                    }
                 }
+                mailbox.clear();
             }
         }
     };
+}
 
-    ( $component:expr, $ctx:expr, { $external:pat_param => $external_handler:block, $internal:pat_param => $internal_handler:block } ) => {
-        if let Some(mailbox) = $ctx.post_office.mailbox($component) {
-            for message in mailbox.iter() {
-                match message {
-                    Either::Left($external) => $external_handler,
-                    Either::Right($internal) => $internal_handler,
-                }
-            }
-            mailbox.clear();
-        }
+#[macro_export]
+macro_rules! build_message_pattern {
+    ( $_:ty = $pat:pat_param ) => {
+        Either::Right($pat)
+    };
+
+    ( $pat:pat_param ) => {
+        Either::Left($pat)
     };
 }

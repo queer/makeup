@@ -9,7 +9,7 @@ use makeup_console::Keypress;
 use crate::component::{
     DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
 };
-use crate::{Component, DrawCommand};
+use crate::{check_mail, Component, DrawCommand};
 
 /// A simple component that renders text under the cursor.
 #[derive(Debug)]
@@ -45,33 +45,25 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
         &mut self,
         ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
     ) -> Result<()> {
-        if let Some(mailbox) = ctx.post_office.mailbox(self) {
-            let mut offset = 0i32;
-            for msg in mailbox.iter() {
+        let mut offset = 0i32;
+        check_mail!(self, ctx, {
+            MakeupMessage = msg => {
                 match msg {
-                    Either::Left(_msg) => {
-                        // log::debug!("Spinner received message: {:?}", msg);
+                    MakeupMessage::Keypress(Keypress::Char(c)) => {
+                        self.buffer.push(*c);
                     }
-                    #[allow(clippy::single_match)]
-                    Either::Right(msg) => match msg {
-                        // TODO: Handle arrow keys etc.
-                        MakeupMessage::Keypress(Keypress::Char(c)) => {
-                            self.buffer.push(*c);
-                        }
-                        MakeupMessage::Keypress(Keypress::Backspace) => {
-                            self.buffer.pop();
-                            offset -= 1;
-                        }
-                        _ => {}
-                    },
+                    MakeupMessage::Keypress(Keypress::Backspace) => {
+                        self.buffer.pop();
+                        offset -= 1;
+                    }
+                    _ => {},
                 }
             }
-            mailbox.clear();
-            if offset != 0 {
-                self.input_offset = Some(offset);
-            } else {
-                self.input_offset = None;
-            }
+        });
+        if offset != 0 {
+            self.input_offset = Some(offset);
+        } else {
+            self.input_offset = None;
         }
 
         Ok(())

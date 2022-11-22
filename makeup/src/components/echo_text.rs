@@ -7,7 +7,7 @@ use eyre::Result;
 use crate::component::{
     DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
 };
-use crate::{Component, DrawCommand};
+use crate::{check_mail, Component, DrawCommand};
 
 /// A simple component that renders text under the cursor.
 #[derive(Debug)]
@@ -39,23 +39,13 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
         &mut self,
         ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
     ) -> Result<()> {
-        if let Some(mailbox) = ctx.post_office.mailbox(self) {
-            for msg in mailbox.iter() {
-                match msg {
-                    Either::Left(_msg) => {
-                        // log::debug!("Spinner received message: {:?}", msg);
-                    }
-                    #[allow(clippy::single_match)]
-                    Either::Right(msg) => match msg {
-                        MakeupMessage::TextUpdate(text) => {
-                            self.text = text.clone();
-                        }
-                        _ => {}
-                    },
+        check_mail!(self, ctx, {
+            MakeupMessage = msg => {
+                if let MakeupMessage::TextUpdate(text) = msg {
+                    self.text = text.clone();
                 }
             }
-            mailbox.clear();
-        }
+        });
 
         Ok(())
     }
