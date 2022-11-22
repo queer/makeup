@@ -54,10 +54,17 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
             self.started = true;
         }
 
+        if let Some(mailbox) = ctx.post_office.mailbox(self) {
+            dbg!(mailbox);
+        }
+
         check_mail!(self, ctx, {
-            msg if MakeupMessage => {
+            'makeup:
+
+            msg => {
                 if let MakeupMessage::TimerTick(_) = msg {
                     self.step = (self.step + 1) % self.spin_steps.len();
+                    #[cfg(not(test))]
                     ctx.sender.send_makeup_message_after(
                         self.key(),
                         MakeupMessage::TimerTick(self.interval),

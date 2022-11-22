@@ -68,7 +68,8 @@ impl Component for Wave {
         }
 
         check_mail!(self, ctx, {
-            msg if MakeupMessage => {
+            'makeup:
+            msg => {
                 if let MakeupMessage::TimerTick(_) = msg {
                     self.step = (self.step + 1) % 10;
                     ctx.sender.send_makeup_message_after(self.key(), MakeupMessage::TimerTick(DURATION), DURATION)?;

@@ -72,44 +72,33 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
 /// use makeup::check_mail;
 ///
 /// check_mail!(self, ctx, {
+///     msg => {
+///         // Handle your custom message here!
+///     }
+///     // Indicate that all following handlers are for makeup messages. Must be specified even if there are no handlers.
+///     'makeup:
 ///     msg if MakeupMessage => {
 ///         if let MakeupMessage::TextUpdate(text) = msg {
 ///             self.text = text.clone();
 ///         }
 ///     }
-//
-///     msg => {
-///         // Handle your custom message here!
-///     }
 /// });
 /// ```
 #[macro_export]
 macro_rules! check_mail {
-    ( $component:expr, $ctx:expr, { $( $message_pattern:pat $( if $kind:ty )? => $handler:block )+ } ) => {
+    ( $component:expr, $ctx:expr, { $( $lpattern:pat => $lhandler:block )*'makeup: $( $rpattern:pat => $rhandler:block )* } ) => {
         {
-            use $crate::build_message_pattern;
             if let Some(mailbox) = $ctx.post_office.mailbox($component) {
                 for message in mailbox.iter() {
                     match message {
-                        build_message_pattern!( $( $message_pattern $( if $kind )? )+ ) => {
-                            $( $handler )+
-                        }
-                        _ => {},
+                        $(Either::Left($lpattern) => $lhandler)*
+                        $(Either::Right($rpattern) => $rhandler)*
+                        _ => {}
                     }
                 }
+
                 mailbox.clear();
             }
         }
-    };
-}
-
-#[macro_export]
-macro_rules! build_message_pattern {
-    ( $pat:pat if $kind:ty ) => {
-        Either::Right($pat)
-    };
-
-    ( $pat:pat ) => {
-        Either::Left($pat)
     };
 }

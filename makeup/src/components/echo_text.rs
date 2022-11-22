@@ -40,7 +40,8 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
         ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
     ) -> Result<()> {
         check_mail!(self, ctx, {
-            msg if MakeupMessage => {
+            'makeup:
+            msg => {
                 if let MakeupMessage::TextUpdate(text) = msg {
                     self.text = text.clone();
                 }
