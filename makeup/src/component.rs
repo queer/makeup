@@ -98,6 +98,7 @@ impl<M: std::fmt::Debug + Send + Sync + Clone + 'static> MessageSender<M> {
     }
 
     /// Send a [`MakeupMessage`] to the given component after waiting for the
+    /// given duration.
     pub fn send_makeup_message_after(
         &self,
         key: Key,
@@ -112,18 +113,24 @@ impl<M: std::fmt::Debug + Send + Sync + Clone + 'static> MessageSender<M> {
         Ok(())
     }
 
+    /// Send a message to the currently-focused component.
     pub fn send_message_to_focused(&self, msg: M) -> Result<()> {
         self.send_message(self.focus, msg)
     }
 
+    /// Send a [`MakeupMessage`] to the currently-focused component.
     pub fn send_makeup_message_to_focused(&self, msg: MakeupMessage) -> Result<()> {
         self.send_makeup_message(self.focus, msg)
     }
 
+    /// Send a message to the currently-focused component after waiting for the
+    /// given duration.
     pub fn send_message_to_focused_after(&self, msg: M, duration: Duration) -> Result<()> {
         self.send_message_after(self.focus, msg, duration)
     }
 
+    /// Send a [`MakeupMessage`] to the currently-focused component after
+    /// waiting for the given duration.
     pub fn send_makeup_message_to_focused_after(
         &self,
         msg: MakeupMessage,
