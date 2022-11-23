@@ -58,6 +58,9 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UpdateContext<'a, M
 }
 
 /// A helper for components to use for message-sending during the update loop.
+/// These functions are not on the [`UpdateContext`] itself because the
+/// `sender` needs to be able to be moved across threads with a `'static`
+/// lifetime, and that's achieved by repeatedly cloning the `sender`.
 #[derive(Debug, Clone)]
 pub struct MessageSender<M: std::fmt::Debug + Send + Sync + Clone + 'static> {
     focus: Key,
