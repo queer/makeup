@@ -38,6 +38,10 @@ pub trait Renderer: std::fmt::Debug + AsAny {
     fn cursor(&self) -> Coordinates;
 
     fn dimensions(&self) -> Dimensions;
+
+    fn set_width(&mut self, w: Dimension);
+
+    fn set_height(&mut self, h: Dimension);
 }
 
 /// An error that occurred during rendering.

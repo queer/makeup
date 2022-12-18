@@ -12,8 +12,8 @@ use crate::{DrawCommand, Renderer};
 pub struct MemoryRenderer {
     cursor_x: Coordinate,
     cursor_y: Coordinate,
-    width: Dimension,
-    height: Dimension,
+    pub(crate) width: Dimension,
+    pub(crate) height: Dimension,
     text: std::collections::HashMap<Coordinates, char>,
 }
 
@@ -133,6 +133,14 @@ impl Renderer for MemoryRenderer {
 
     fn dimensions(&self) -> Dimensions {
         (self.width, self.height)
+    }
+
+    fn set_width(&mut self, width: Dimension) {
+        self.width = width;
+    }
+
+    fn set_height(&mut self, height: Dimension) {
+        self.height = height;
     }
 }
 

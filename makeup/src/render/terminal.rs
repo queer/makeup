@@ -2,6 +2,7 @@ use std::io::Write;
 
 use async_trait::async_trait;
 use eyre::Result;
+use makeup_ansi::DisplayEraseMode;
 
 use crate::component::DrawCommandBatch;
 use crate::{Ansi, DrawCommand};
@@ -31,12 +32,21 @@ impl TerminalRenderer {
 #[async_trait]
 impl Renderer for TerminalRenderer {
     async fn render(&mut self, commands: &[DrawCommandBatch]) -> Result<()> {
+        let mut buffer = String::new();
+
+        // Handle terminal resizes.
+        // Blank the screen to avoid lingering state on rerender.
+        let (w, h) = ioctls::get_terminal_size();
+        if w != self.memory_renderer.width || h != self.memory_renderer.height {
+            self.set_width(w);
+            self.set_height(h);
+            buffer += &Ansi::EraseInDisplay(DisplayEraseMode::All).to_string();
+        }
+
         // Save the cursor position before each render, and restore it after.
         // Not restoring the cursor position until we've saved it the first
         // time ensures that ex. the cursor will be positioned at the expected
         // character when rendering.
-        let mut buffer = String::new();
-
         if self.saved_position {
             buffer += &Ansi::RestoreCursorPosition.to_string();
         } else {
@@ -149,6 +159,14 @@ impl Renderer for TerminalRenderer {
 
     fn dimensions(&self) -> Coordinates {
         self.memory_renderer.dimensions()
+    }
+
+    fn set_width(&mut self, width: Dimension) {
+        self.memory_renderer.set_width(width);
+    }
+
+    fn set_height(&mut self, height: Dimension) {
+        self.memory_renderer.set_height(height);
     }
 }
 
