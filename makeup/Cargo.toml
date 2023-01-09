@@ -13,7 +13,7 @@ keywords = ["cli", "tui", "terminal", "color", "60fps"]
 
 [dependencies]
 async-recursion = "1.0.0"
-async-trait = "0.1.60"
+async-trait = "0.1.61"
 either = "1.8.0"
 eyre = "0.6.8"
 futures-util = "0.3.25"
