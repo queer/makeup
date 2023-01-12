@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -21,6 +22,7 @@ use crate::{Ansi, Component, DisplayEraseMode, Input, Renderer};
 #[derive(Debug, Clone)]
 pub enum UiControlMessage {
     MoveFocus(Key),
+    StopRendering,
 }
 
 /// A makeup UI. Generally used with [`crate::render::TerminalRenderer`].
@@ -40,6 +42,7 @@ pub struct MUI<
     input_tx: UnboundedSender<InputFrame>,
     input_rx: Arc<Mutex<UnboundedReceiver<InputFrame>>>,
     input: I,
+    done: RefCell<bool>,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M, I> {
@@ -57,6 +60,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
             input_tx,
             input_rx: Arc::new(Mutex::new(input_rx)),
             input,
+            done: RefCell::new(false),
         }
     }
 
@@ -68,8 +72,10 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
     /// - Render the UI
     /// The MUI will attempt to render at 60fps, sleeping as needed to stay at
     /// the frame target.
-    #[allow(unreachable_code)]
     pub async fn render(&'a self, screen: bool) -> Result<()> {
+        if *self.done.borrow() {
+            return Err(eyre::eyre!("Attempted to run UI when already done!"));
+        }
         if screen {
             // Enter alternate screen
             print!("\x1b[?1049h");
@@ -92,7 +98,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
 
         // Input setup.
         // Don't want the clones escaping this scope.
-        {
+        let input_handle = {
             let input = self.input.clone();
             let input_tx = self.input_tx.clone();
             tokio::spawn(async move {
@@ -109,8 +115,8 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
                         break;
                     }
                 }
-            });
-        }
+            })
+        };
 
         'render_loop: loop {
             let start = Instant::now();
@@ -141,17 +147,22 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
                         eprintln!("Error: Input disconnected!?");
                         break 'render_loop;
                     }
-                    Err(_) => {
+                    Err(TryRecvError::Empty) => {
                         break;
                     }
                 }
             }
 
-            if let Err(e) = self.render_frame(&pending_input, &mut render_context).await {
-                // TODO: Handle gracefully
-                eprintln!("Error: {}", e);
-                break 'render_loop;
-            }
+            let currently_exiting =
+                match self.render_frame(&pending_input, &mut render_context).await {
+                    Ok(exiting) => exiting,
+                    Err(e) => {
+                        // TODO: Handle gracefully
+                        eprintln!("Error: {}", e);
+                        break 'render_loop;
+                    }
+                };
+
             frame_counter += 1;
 
             let elapsed = start.elapsed();
@@ -167,6 +178,12 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
                 tokio::time::sleep(duration).await
             } else {
                 // log::warn!("Frame took too long to render: {:?}", elapsed);
+            }
+
+            if currently_exiting {
+                self.done.replace(true);
+                input_handle.abort();
+                break 'render_loop;
             }
         }
         if screen {
@@ -187,24 +204,28 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
             focus: 0,
         };
 
-        self.render_frame(&[], &mut ctx).await
+        self.render_frame(&[], &mut ctx).await?;
+
+        Ok(())
     }
 
     /// Apply any pending `Mailbox`es and render the current frame. Makes no
     /// guarantees about hitting a framerate target, but instead renders as
     /// fast as possible.
+    ///
+    /// Returns whether or not the UI is currently stopping.
     async fn render_frame(
         &'a self,
         pending_input: &[Keypress],
         ctx: &mut RenderContext,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let mut ui = self.ui.lock().await;
         let commands = ui.render(pending_input, ctx).await?;
 
         let mut renderer = self.renderer.write().await;
         renderer.render(&commands).await?;
 
-        Ok(())
+        Ok(ui.exiting)
     }
 
     /// Send a message to the given component.
@@ -243,6 +264,7 @@ struct UI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
     post_office: Arc<RwLocked<PostOffice<M>>>,
     focus: Key,
     components: Vec<Key>,
+    exiting: bool,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
@@ -255,6 +277,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
             post_office: Arc::new(RwLocked::new(PostOffice::new())),
             focus: focus_key,
             components,
+            exiting: false,
         }
     }
 
@@ -272,6 +295,9 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
             match message {
                 UiControlMessage::MoveFocus(key) => {
                     self.focus = *key;
+                }
+                UiControlMessage::StopRendering => {
+                    self.exiting = true;
                 }
             }
         }

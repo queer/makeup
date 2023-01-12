@@ -1,10 +1,15 @@
 use std::os::unix::prelude::AsRawFd;
+use std::time::Duration;
 
 use async_recursion::async_recursion;
 use eyre::{eyre, Result};
 use nix::poll::{poll, PollFd, PollFlags};
+use nix::sys::select::FdSet;
+use nix::sys::signal::Signal;
+use nix::sys::signalfd::SigSet;
 use nix::sys::termios;
 use nix::sys::termios::InputFlags;
+use nix::sys::time::TimeSpec;
 use nix::unistd::isatty;
 use tokio::fs::File;
 
@@ -152,12 +157,9 @@ async fn read_next_key(fd: std::os::unix::io::RawFd) -> Result<Keypress> {
         }
         None => {
             // there is no subsequent byte ready to be read, block and wait for input
-
             let pollfd = PollFd::new(fd, PollFlags::POLLIN);
-            // In THEORY the last error should already be set, since it just happened
             let ret = poll(&mut [pollfd], 0)?;
 
-            // negative timeout means that it will block indefinitely
             if ret < 0 {
                 let last_error = std::io::Error::last_os_error();
                 if last_error.kind() == std::io::ErrorKind::Interrupted {
@@ -175,10 +177,29 @@ async fn read_next_key(fd: std::os::unix::io::RawFd) -> Result<Keypress> {
 
 fn read_byte(fd: std::os::unix::io::RawFd) -> Result<Option<u8>> {
     let mut buf = [0u8; 1];
+    let mut read_fds = FdSet::new();
+    read_fds.insert(fd);
 
-    match nix::unistd::read(fd, &mut buf) {
+    let mut signals = SigSet::empty();
+    signals.add(Signal::SIGINT);
+
+    match nix::sys::select::pselect(
+        fd + 1,
+        Some(&mut read_fds),
+        Some(&mut FdSet::new()),
+        Some(&mut FdSet::new()),
+        Some(&TimeSpec::new(
+            0,
+            Duration::from_millis(50).as_nanos() as i64,
+        )),
+        Some(&signals),
+    ) {
         Ok(0) => Ok(None),
-        Ok(_) => Ok(Some(buf[0])),
+        Ok(_) => match nix::unistd::read(fd, &mut buf) {
+            Ok(0) => Ok(None),
+            Ok(_) => Ok(Some(buf[0])),
+            Err(err) => Err(err.into()),
+        },
         Err(err) => Err(err.into()),
     }
 }

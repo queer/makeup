@@ -20,7 +20,7 @@ pub use terminal::TerminalRenderer;
 /// Renderers that might be useful to implement on your own are things like:
 /// - A renderer that can render to a canvas backend, for trivial WASM parity
 #[async_trait]
-pub trait Renderer: std::fmt::Debug + AsAny {
+pub trait Renderer: std::fmt::Debug + AsAny + Send + Sync {
     async fn render(&mut self, commands: &[DrawCommandBatch]) -> Result<()>;
 
     async fn move_cursor(&mut self, x: Coordinate, y: Coordinate) -> Result<()>;
