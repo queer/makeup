@@ -9,7 +9,7 @@ categories = ["command-line-interface"]
 keywords = ["console"]
 
 [dependencies]
-tokio = { version = "1.24.1", features = ["full"] }
+tokio = { version = "1.24.2", features = ["full"] }
 eyre = "0.6.8"
 nix = "0.26.2"
 libc = "0.2.139"
