@@ -7,7 +7,7 @@ use makeup::render::terminal::TerminalRenderer;
 use makeup::MUI;
 
 use eyre::Result;
-use makeup::ui::UiControlMessage;
+use makeup::ui::{RenderState, UiControlMessage};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -17,32 +17,26 @@ async fn main() -> Result<()> {
     let mui = Arc::new(MUI::<()>::new(&mut root, &mut renderer, input));
     let stop_mui = mui.clone();
 
-    let mut flag = false;
     'outer: loop {
-        if flag {
-            break;
-        }
         // tokio::select! over the mui.render() future and the time::sleep future
-
-        println!("next");
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_secs(1)) => {
-                flag = true;
                 stop_mui.send_control(UiControlMessage::StopRendering).await;
             }
             res = mui.render(false) => {
                 match res {
+                    Ok(RenderState::Stopped) => {
+                        break 'outer;
+                    }
                     Ok(_) => {}
                     Err(e) => {
-                        eprintln!("Error: {}", e);
+                        eprintln!("Error: {e}");
                         break 'outer;
                     }
                 }
             }
         }
     }
-
-    println!("done");
 
     Ok(())
 }

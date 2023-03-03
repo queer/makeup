@@ -54,8 +54,8 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
             self.started = true;
         }
 
-        if let Some(mailbox) = ctx.post_office.mailbox(self) {
-            dbg!(mailbox);
+        if let Some(_mailbox) = ctx.post_office.mailbox(self) {
+            // dbg!(mailbox);
         }
 
         check_mail!(self, ctx, {

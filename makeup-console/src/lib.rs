@@ -59,7 +59,7 @@ use tokio::fs::File;
 ///   - Else, if no byte to read:
 ///     - If stdin is a terminal, return None
 /// - Disable TCSADRAIN
-pub async fn next_keypress() -> Result<Keypress> {
+pub async fn next_keypress() -> Result<Option<Keypress>> {
     let fd = if isatty(libc::STDIN_FILENO)? {
         libc::STDIN_FILENO
     } else {
@@ -93,56 +93,60 @@ pub async fn next_keypress() -> Result<Keypress> {
 }
 
 #[async_recursion]
-async fn read_next_key(fd: std::os::unix::io::RawFd) -> Result<Keypress> {
+async fn read_next_key(fd: std::os::unix::io::RawFd) -> Result<Option<Keypress>> {
     match read_char(fd)? {
         Some('\x1b') => match read_char(fd)? {
             Some('[') => match read_char(fd)? {
-                Some('A') => Ok(Keypress::Up),
-                Some('B') => Ok(Keypress::Down),
-                Some('C') => Ok(Keypress::Right),
-                Some('D') => Ok(Keypress::Left),
-                Some('H') => Ok(Keypress::Home),
-                Some('F') => Ok(Keypress::End),
-                Some('Z') => Ok(Keypress::ShiftTab),
+                Some('A') => Ok(Some(Keypress::Up)),
+                Some('B') => Ok(Some(Keypress::Down)),
+                Some('C') => Ok(Some(Keypress::Right)),
+                Some('D') => Ok(Some(Keypress::Left)),
+                Some('H') => Ok(Some(Keypress::Home)),
+                Some('F') => Ok(Some(Keypress::End)),
+                Some('Z') => Ok(Some(Keypress::ShiftTab)),
                 Some(byte3) => match read_char(fd)? {
                     Some('~') => match read_char(fd)? {
-                        Some('1') => Ok(Keypress::Home),
-                        Some('2') => Ok(Keypress::Insert),
-                        Some('3') => Ok(Keypress::Delete),
-                        Some('4') => Ok(Keypress::End),
-                        Some('5') => Ok(Keypress::PageUp),
-                        Some('6') => Ok(Keypress::PageDown),
-                        Some('7') => Ok(Keypress::Home),
-                        Some('8') => Ok(Keypress::End),
-                        Some(byte5) => Ok(Keypress::UnknownSequence(vec![
+                        Some('1') => Ok(Some(Keypress::Home)),
+                        Some('2') => Ok(Some(Keypress::Insert)),
+                        Some('3') => Ok(Some(Keypress::Delete)),
+                        Some('4') => Ok(Some(Keypress::End)),
+                        Some('5') => Ok(Some(Keypress::PageUp)),
+                        Some('6') => Ok(Some(Keypress::PageDown)),
+                        Some('7') => Ok(Some(Keypress::Home)),
+                        Some('8') => Ok(Some(Keypress::End)),
+                        Some(byte5) => Ok(Some(Keypress::UnknownSequence(vec![
                             '\x1b', '[', byte3, '~', byte5,
-                        ])),
-                        None => Ok(Keypress::UnknownSequence(vec!['\x1b', '[', byte3, '~'])),
+                        ]))),
+                        None => Ok(Some(Keypress::UnknownSequence(vec![
+                            '\x1b', '[', byte3, '~',
+                        ]))),
                     },
-                    Some(byte4) => Ok(Keypress::UnknownSequence(vec!['\x1b', '[', byte3, byte4])),
-                    None => Ok(Keypress::UnknownSequence(vec!['\x1b', '[', byte3])),
+                    Some(byte4) => Ok(Some(Keypress::UnknownSequence(vec![
+                        '\x1b', '[', byte3, byte4,
+                    ]))),
+                    None => Ok(Some(Keypress::UnknownSequence(vec!['\x1b', '[', byte3]))),
                 },
-                None => Ok(Keypress::Escape),
+                None => Ok(Some(Keypress::Escape)),
             },
-            Some(byte) => Ok(Keypress::UnknownSequence(vec!['\x1b', byte])),
-            None => Ok(Keypress::Escape),
+            Some(byte) => Ok(Some(Keypress::UnknownSequence(vec!['\x1b', byte]))),
+            None => Ok(Some(Keypress::Escape)),
         },
-        Some('\r') | Some('\n') => Ok(Keypress::Return),
-        Some('\t') => Ok(Keypress::Tab),
-        Some('\x7f') => Ok(Keypress::Backspace),
-        Some('\x01') => Ok(Keypress::Home),
+        Some('\r') | Some('\n') => Ok(Some(Keypress::Return)),
+        Some('\t') => Ok(Some(Keypress::Tab)),
+        Some('\x7f') => Ok(Some(Keypress::Backspace)),
+        Some('\x01') => Ok(Some(Keypress::Home)),
         // ^C
         Some('\x03') => Err(ConsoleError::Interrupted.into()),
-        Some('\x05') => Ok(Keypress::End),
-        Some('\x08') => Ok(Keypress::Backspace),
+        Some('\x05') => Ok(Some(Keypress::End)),
+        Some('\x08') => Ok(Some(Keypress::Backspace)),
         Some(byte) => {
             if (byte as u8) & 224u8 == 192u8 {
                 let bytes = vec![byte as u8, read_byte(fd)?.unwrap()];
-                Ok(Keypress::Char(char_from_utf8(&bytes)?))
+                Ok(Some(Keypress::Char(char_from_utf8(&bytes)?)))
             } else if (byte as u8) & 240u8 == 224u8 {
                 let bytes: Vec<u8> =
                     vec![byte as u8, read_byte(fd)?.unwrap(), read_byte(fd)?.unwrap()];
-                Ok(Keypress::Char(char_from_utf8(&bytes)?))
+                Ok(Some(Keypress::Char(char_from_utf8(&bytes)?)))
             } else if (byte as u8) & 248u8 == 240u8 {
                 let bytes: Vec<u8> = vec![
                     byte as u8,
@@ -150,9 +154,9 @@ async fn read_next_key(fd: std::os::unix::io::RawFd) -> Result<Keypress> {
                     read_byte(fd)?.unwrap(),
                     read_byte(fd)?.unwrap(),
                 ];
-                Ok(Keypress::Char(char_from_utf8(&bytes)?))
+                Ok(Some(Keypress::Char(char_from_utf8(&bytes)?)))
             } else {
-                Ok(Keypress::Char(byte))
+                Ok(Some(Keypress::Char(byte)))
             }
         }
         None => {
@@ -170,7 +174,7 @@ async fn read_next_key(fd: std::os::unix::io::RawFd) -> Result<Keypress> {
                 }
             }
 
-            read_next_key(fd).await
+            Ok(None)
         }
     }
 }
@@ -182,6 +186,8 @@ fn read_byte(fd: std::os::unix::io::RawFd) -> Result<Option<u8>> {
 
     let mut signals = SigSet::empty();
     signals.add(Signal::SIGINT);
+    signals.add(Signal::SIGTERM);
+    signals.add(Signal::SIGKILL);
 
     match nix::sys::select::pselect(
         fd + 1,

@@ -162,7 +162,7 @@ impl Ansi {
                 write!(f, ansi!("8;{};{}t"), height, width)
             }
             Self::TerminalTitle(title) => {
-                write!(f, "\x1B]0;{}\x07", title)
+                write!(f, "\x1B]0;{title}\x07")
             }
             Self::TerminalForegroundColour(colour) => {
                 write!(f, ansi!("38;5;{}"), colour.index())
@@ -287,11 +287,11 @@ impl Ansi {
                         }
                         SgrParameter::HexForegroundColour(hex) => {
                             let (r, g, b) = Self::rgb(hex);
-                            write!(f, "38;2;{};{};{}", r, g, b)
+                            write!(f, "38;2;{r};{g};{b}")
                         }
                         SgrParameter::HexBackgroundColour(hex) => {
                             let (r, g, b) = Self::rgb(hex);
-                            write!(f, "48;2;{};{};{}", r, g, b)
+                            write!(f, "48;2;{r};{g};{b}")
                         }
                         SgrParameter::DefaultForegroundColour => {
                             write!(f, "39")
@@ -307,7 +307,7 @@ impl Ansi {
                         }
                         SgrParameter::HexUnderlineColour(hex) => {
                             let (r, g, b) = Self::rgb(hex);
-                            write!(f, "58;2;{};{};{}", r, g, b)
+                            write!(f, "58;2;{r};{g};{b}")
                         }
                         SgrParameter::DefaultUnderlineColour => {
                             write!(f, "59")

@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -25,6 +24,12 @@ pub enum UiControlMessage {
     StopRendering,
 }
 
+#[derive(Debug)]
+pub enum RenderState {
+    Running,
+    Stopped,
+}
+
 /// A makeup UI. Generally used with [`crate::render::TerminalRenderer`].
 ///
 /// MUIs are supposed to be entirely async. Components are updated and rendered
@@ -42,7 +47,7 @@ pub struct MUI<
     input_tx: UnboundedSender<InputFrame>,
     input_rx: Arc<Mutex<UnboundedReceiver<InputFrame>>>,
     input: I,
-    done: RefCell<bool>,
+    done: Arc<Mutex<bool>>,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M, I> {
@@ -60,7 +65,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
             input_tx,
             input_rx: Arc::new(Mutex::new(input_rx)),
             input,
-            done: RefCell::new(false),
+            done: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -72,9 +77,12 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
     /// - Render the UI
     /// The MUI will attempt to render at 60fps, sleeping as needed to stay at
     /// the frame target.
-    pub async fn render(&'a self, screen: bool) -> Result<()> {
-        if *self.done.borrow() {
-            return Err(eyre::eyre!("Attempted to run UI when already done!"));
+    pub async fn render(&'a self, screen: bool) -> Result<RenderState> {
+        {
+            let done = self.done.lock().await;
+            if *done {
+                return Ok(RenderState::Stopped);
+            }
         }
         if screen {
             // Enter alternate screen
@@ -98,6 +106,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
 
         // Input setup.
         // Don't want the clones escaping this scope.
+        let done_for_input = self.done.clone();
         let input_handle = {
             let input = self.input.clone();
             let input_tx = self.input_tx.clone();
@@ -113,6 +122,12 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
                     }
                     if done {
                         break;
+                    }
+                    {
+                        let done = done_for_input.lock().await;
+                        if *done {
+                            break;
+                        }
                     }
                 }
             })
@@ -140,6 +155,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
                     Ok(InputFrame::Frame(key)) => {
                         pending_input.push(key);
                     }
+                    Ok(InputFrame::Empty) => {}
                     Ok(InputFrame::End) => {
                         break 'render_loop;
                     }
@@ -158,10 +174,12 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
                     Ok(exiting) => exiting,
                     Err(e) => {
                         // TODO: Handle gracefully
-                        eprintln!("Error: {}", e);
+                        eprintln!("Error: {e}");
                         break 'render_loop;
                     }
                 };
+
+            self.flush_renderer().await?;
 
             frame_counter += 1;
 
@@ -181,19 +199,25 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
             }
 
             if currently_exiting {
-                self.done.replace(true);
+                {
+                    let mut done = self.done.lock().await;
+                    *done = true;
+                }
                 input_handle.abort();
                 break 'render_loop;
             }
         }
+
         if screen {
             // Leave alternate screen
             print!("\x1b[?1049l");
         }
-        Ok(())
+
+        self.flush_renderer().await?;
+        Ok(RenderState::Stopped)
     }
 
-    pub async fn render_once(&'a self) -> Result<()> {
+    pub async fn render_once(&'a self) -> Result<RenderState> {
         let mut ctx = RenderContext {
             last_frame_time: None,
             frame_counter: 0,
@@ -206,7 +230,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
 
         self.render_frame(&[], &mut ctx).await?;
 
-        Ok(())
+        Ok(RenderState::Running)
     }
 
     /// Apply any pending `Mailbox`es and render the current frame. Makes no
@@ -224,8 +248,16 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
 
         let mut renderer = self.renderer.write().await;
         renderer.render(&commands).await?;
+        renderer.flush().await?;
 
         Ok(ui.exiting)
+    }
+
+    async fn flush_renderer(&'a self) -> Result<()> {
+        let mut renderer = self.renderer.write().await;
+        renderer.flush().await?;
+
+        Ok(())
     }
 
     /// Send a message to the given component.

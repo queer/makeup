@@ -15,7 +15,7 @@ jobs:
   run-clippy:
     strategy:
       matrix:
-        version: ["stable", "1.65", "nightly"]
+        version: ["stable", "1.67", "nightly"]
     if: "github.actor != 'dependabot'"
     runs-on: "ubuntu-latest"
     steps:

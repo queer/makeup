@@ -99,10 +99,14 @@ impl Renderer for TerminalRenderer {
             }
         }
 
-        // NOTE: Can't flush with tokio, doesn't work for some reason.
-        print!("{}", buffer);
-        std::io::stdout().flush()?;
+        print!("{buffer}");
 
+        Ok(())
+    }
+
+    async fn flush(&mut self) -> Result<()> {
+        // NOTE: Can't flush with tokio, doesn't work for some reason.
+        std::io::stdout().flush()?;
         Ok(())
     }
 

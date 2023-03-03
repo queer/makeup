@@ -15,7 +15,7 @@ jobs:
   run-tests:
     strategy:
       matrix:
-        version: ["stable", "nightly", "1.65"]
+        version: ["stable", "nightly", "1.67"]
     runs-on: "ubuntu-latest"
     steps:
     - uses: "actions/checkout@v2"

@@ -92,6 +92,10 @@ impl Renderer for MemoryRenderer {
         Ok(())
     }
 
+    async fn flush(&mut self) -> Result<()> {
+        Ok(())
+    }
+
     async fn move_cursor(&mut self, x: Coordinate, y: Coordinate) -> Result<()> {
         self.bounds_check(x, y)?;
         self.cursor_x = x;

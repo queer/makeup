@@ -23,6 +23,8 @@ pub use terminal::TerminalRenderer;
 pub trait Renderer: std::fmt::Debug + AsAny + Send + Sync {
     async fn render(&mut self, commands: &[DrawCommandBatch]) -> Result<()>;
 
+    async fn flush(&mut self) -> Result<()>;
+
     async fn move_cursor(&mut self, x: Coordinate, y: Coordinate) -> Result<()>;
 
     async fn move_cursor_relative(

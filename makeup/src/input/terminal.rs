@@ -17,7 +17,8 @@ impl TerminalInput {
 impl Input for TerminalInput {
     async fn next_frame(&self) -> Result<InputFrame> {
         match makeup_console::next_keypress().await {
-            Ok(key) => Ok(InputFrame::Frame(key)),
+            Ok(Some(key)) => Ok(InputFrame::Frame(key)),
+            Ok(_) => Ok(InputFrame::Empty),
             Err(report) => {
                 if let Some(err) = report.chain().next() {
                     match err.downcast_ref() {

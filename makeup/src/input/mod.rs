@@ -9,6 +9,7 @@ pub use terminal::TerminalInput;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputFrame {
     Frame(Keypress),
+    Empty,
     End,
 }
 
