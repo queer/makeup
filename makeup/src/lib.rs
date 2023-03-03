@@ -6,6 +6,7 @@
 )]
 #![deny(clippy::perf, clippy::complexity, clippy::cargo)]
 #![allow(clippy::new_without_default)]
+#![allow(clippy::multiple_crate_versions)]
 
 pub mod component;
 pub mod components;
