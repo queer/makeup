@@ -20,7 +20,7 @@ futures-util = "0.3.26"
 rand = "0.8.5"
 thiserror = "1.0.39"
 tokio = { version = "1.26.0", features = ["full"] }
-libc = "0.2.139"
+libc = "0.2.140"
 
 [dev-dependencies]
 colorgrad = "0.6.2"
