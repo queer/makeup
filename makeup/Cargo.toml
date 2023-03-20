@@ -18,7 +18,7 @@ either = "1.8.1"
 eyre = "0.6.8"
 futures-util = "0.3.27"
 rand = "0.8.5"
-thiserror = "1.0.39"
+thiserror = "1.0.40"
 tokio = { version = "1.26.0", features = ["full"] }
 libc = "0.2.140"
 
