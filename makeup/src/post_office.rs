@@ -87,7 +87,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
 /// ```
 #[macro_export]
 macro_rules! check_mail {
-    ( $component:expr, $ctx:expr, { $( $lpattern:pat => $lhandler:block )*'makeup: $( $rpattern:pat => $rhandler:block )* } ) => {
+    ( $component:expr, $ctx:expr, { $( $lpattern:pat => $lhandler:block )* $( 'makeup: $rpattern:pat => $rhandler:block )* } ) => {
         {
             if let Some(mailbox) = $ctx.post_office.mailbox($component) {
                 for message in mailbox.iter() {

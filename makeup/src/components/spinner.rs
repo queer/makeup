@@ -60,7 +60,6 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
 
         check_mail!(self, ctx, {
             'makeup:
-
             msg => {
                 if let MakeupMessage::TimerTick(_) = msg {
                     self.step = (self.step + 1) % self.spin_steps.len();
