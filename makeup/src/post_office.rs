@@ -76,24 +76,19 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
 ///         // Handle your custom message here!
 ///     }
 ///     // Indicate that all following handlers are for makeup messages.
-///     // Must be specified even if there are no handlers.
 ///     'makeup:
-///     msg if MakeupMessage => {
-///         if let MakeupMessage::TextUpdate(text) = msg {
-///             self.text = text.clone();
-///         }
-///     }
+///     MakeupMessage::TextUpdate(text) => self.text = text.clone(),
 /// });
 /// ```
 #[macro_export]
 macro_rules! check_mail {
-    ( $component:expr, $ctx:expr, { $( $lpattern:pat => $lhandler:block )* $( 'makeup: $rpattern:pat => $rhandler:block )* } ) => {
+    ( $component:expr, $ctx:expr, { $( $lpattern:pat => $lhandler:block )* $( 'makeup: $( $rpattern:pat => $rhandler:block )+ )* } ) => {
         {
             if let Some(mailbox) = $ctx.post_office.mailbox($component) {
                 for message in mailbox.iter() {
                     match message {
-                        $(Either::Left($lpattern) => $lhandler)*
-                        $(Either::Right($rpattern) => $rhandler)*
+                        $( Either::Left($lpattern) => $lhandler )*
+                        $( $(Either::Right( $rpattern ) => $rhandler),+ )*
                         _ => {}
                     }
                 }

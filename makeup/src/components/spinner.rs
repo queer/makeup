@@ -60,16 +60,14 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
 
         check_mail!(self, ctx, {
             'makeup:
-            msg => {
-                if let MakeupMessage::TimerTick(_) = msg {
-                    self.step = (self.step + 1) % self.spin_steps.len();
-                    #[cfg(not(test))]
-                    ctx.sender.send_makeup_message_after(
-                        self.key(),
-                        MakeupMessage::TimerTick(self.interval),
-                        self.interval,
-                    )?;
-                }
+            MakeupMessage::TimerTick(_) => {
+                self.step = (self.step + 1) % self.spin_steps.len();
+                #[cfg(not(test))]
+                ctx.sender.send_makeup_message_after(
+                    self.key(),
+                    MakeupMessage::TimerTick(self.interval),
+                    self.interval,
+                )?;
             }
         });
 

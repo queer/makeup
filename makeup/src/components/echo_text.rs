@@ -41,10 +41,8 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
     ) -> Result<()> {
         check_mail!(self, ctx, {
             'makeup:
-            msg => {
-                if let MakeupMessage::TextUpdate(text) = msg {
-                    self.text = text.clone();
-                }
+            MakeupMessage::TextUpdate(text) => {
+                self.text = text.clone();
             }
         });
 
