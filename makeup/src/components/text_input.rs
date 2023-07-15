@@ -46,16 +46,19 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
         ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
     ) -> Result<()> {
         let mut offset = 0i32;
-        check_mail!(self, ctx, {
-            'makeup:
-            MakeupMessage::Keypress(Keypress::Char(c)) => {
-                self.buffer.push(*c);
+        check_mail!(
+            self,
+            ctx,
+            match m {
+                MakeupMessage::Keypress(Keypress::Char(c)) => {
+                    self.buffer.push(*c);
+                }
+                MakeupMessage::Keypress(Keypress::Backspace) => {
+                    self.buffer.pop();
+                    offset -= 1;
+                }
             }
-            MakeupMessage::Keypress(Keypress::Backspace) => {
-                self.buffer.pop();
-                offset -= 1;
-            }
-        });
+        );
         if offset != 0 {
             self.input_offset = Some(offset);
         } else {

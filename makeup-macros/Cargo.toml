@@ -1,0 +1,20 @@
+[package]
+name = "makeup-macros"
+version = "0.0.1"
+edition = "2021"
+description = "Macro helper library for makeup"
+repository = "https://github.com/queer/makeup"
+license = "MIT"
+readme = "../README.md"
+keywords = ["cli"]
+categories = ["development-tools"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+proc-macro2 = "1.0.64"
+quote = "1.0.29"
+syn = "2.0.26"
+
+[lib]
+proc-macro = true

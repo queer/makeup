@@ -67,15 +67,20 @@ impl Component for Wave {
             sender.send_makeup_message(self.key(), MakeupMessage::TimerTick(DURATION))?;
         }
 
-        check_mail!(self, ctx, {
-            'makeup:
-            msg => {
-                if let MakeupMessage::TimerTick(_) = msg {
+        check_mail!(
+            self,
+            ctx,
+            match m {
+                MakeupMessage::TimerTick(_) => {
                     self.step = (self.step + 1) % 10;
-                    ctx.sender.send_makeup_message_after(self.key(), MakeupMessage::TimerTick(DURATION), DURATION)?;
+                    ctx.sender.send_makeup_message_after(
+                        self.key(),
+                        MakeupMessage::TimerTick(DURATION),
+                        DURATION,
+                    )?;
                 }
             }
-        });
+        );
 
         Ok(())
     }

@@ -43,12 +43,15 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedTex
         &mut self,
         ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
     ) -> Result<()> {
-        check_mail!(self, ctx, {
-            'makeup:
-            MakeupMessage::TextUpdate(text) => {
-                self.text = text.clone();
+        check_mail!(
+            self,
+            ctx,
+            match m {
+                MakeupMessage::TextUpdate(text) => {
+                    self.text = text.clone();
+                }
             }
-        });
+        );
 
         Ok(())
     }

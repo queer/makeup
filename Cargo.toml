@@ -2,5 +2,6 @@
 members = [
   "makeup-ansi",
   "makeup-console",
+  "makeup-macros",
   "makeup",
 ]

@@ -64,6 +64,18 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
     }
 }
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! mail_pattern {
+    ( $pattern:pat, MakeupMessage$($bullshit:tt)* ) => {
+        Either::Right($pattern)
+    };
+
+    ( $pattern:pat, $x___:ty ) => {
+        Either::Left($pattern)
+    };
+}
+
 /// Check the mail for the current component. Clears mailboxes after reading.
 ///
 /// Example:
@@ -82,19 +94,13 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
 /// ```
 #[macro_export]
 macro_rules! check_mail {
-    ( $component:expr, $ctx:expr, { $( $lpattern:pat => $lhandler:block )* $( 'makeup: $( $rpattern:pat => $rhandler:block )+ )* } ) => {
-        {
-            if let Some(mailbox) = $ctx.post_office.mailbox($component) {
-                for message in mailbox.iter() {
-                    match message {
-                        $( Either::Left($lpattern) => $lhandler )*
-                        $( $(Either::Right( $rpattern ) => $rhandler),+ )*
-                        _ => {}
-                    }
-                }
-
-                mailbox.clear();
+    ( $component:expr, $ctx:expr, $arms:expr ) => {{
+        if let Some(mailbox) = $ctx.post_office.mailbox($component) {
+            for message in mailbox.iter() {
+                (makeup_macros::__do_check_mail_arms!($arms))
             }
+
+            mailbox.clear();
         }
-    };
+    }};
 }
