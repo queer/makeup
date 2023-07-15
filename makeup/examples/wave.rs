@@ -70,7 +70,7 @@ impl Component for Wave {
         check_mail!(
             self,
             ctx,
-            match m {
+            match _ {
                 MakeupMessage::TimerTick(_) => {
                     self.step = (self.step + 1) % 10;
                     ctx.sender.send_makeup_message_after(

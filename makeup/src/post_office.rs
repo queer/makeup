@@ -83,12 +83,10 @@ macro_rules! mail_pattern {
 /// ```ignore
 /// use makeup::check_mail;
 ///
-/// check_mail!(self, ctx, {
-///     msg => {
+/// check_mail!(self, ctx, match _ {
+///     MyMessage::Foo => {
 ///         // Handle your custom message here!
 ///     }
-///     // Indicate that all following handlers are for makeup messages.
-///     'makeup:
 ///     MakeupMessage::TextUpdate(text) => self.text = text.clone(),
 /// });
 /// ```

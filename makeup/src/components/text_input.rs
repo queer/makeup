@@ -49,7 +49,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
         check_mail!(
             self,
             ctx,
-            match m {
+            match _ {
                 MakeupMessage::Keypress(Keypress::Char(c)) => {
                     self.buffer.push(*c);
                 }

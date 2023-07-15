@@ -57,7 +57,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
         check_mail!(
             self,
             ctx,
-            match m {
+            match _ {
                 MakeupMessage::TimerTick(_) => {
                     self.step = (self.step + 1) % self.spin_steps.len();
                     #[cfg(not(test))]

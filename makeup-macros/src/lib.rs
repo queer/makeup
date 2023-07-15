@@ -1,35 +1,3 @@
-// Write a proc macro that takes in code that looks like the following:
-//
-// check_mail!(self, ctx, {
-//     MakeupMessage::TextUpdate(text) => { ... }
-//     MakeupMessage::Tick(_) => { ... }
-//     MyMessage::Foo => { ... }
-// });
-//
-// and produces code like the following:
-//
-// if let Some(mailbox) = ctx.post_office.mailbox(self) {
-//     for message in mailbox.iter() {
-//         match message {
-//             Either::Left(MyMessage::Foo) => { ... }
-//             Either::Right(MakeupMessage::TextUpdate(text)) => { ... }
-//             Either::Right(MakeupMessage::Tick(_)) => { ... }
-//         }
-//     }
-// }
-//
-// That is, it should:
-// - Take in a list of patterns and handlers
-// - If the pattern starts with the token `MakeupMessage`, it should be placed in the right-hand
-//   side of the match expression.
-// - If the pattern does not start with the token `MakeupMessage`, it should be placed in the
-//   left-hand side of the match expression.
-//
-// And it MUST:
-// - Check the first token
-// - NOT put the pattern into both sides of the expr
-// THIS CODE MUST NOT JUST REPEAT THE EXAMPLE GIVEN.
-
 use quote::quote;
 
 #[doc(hidden)]

@@ -46,7 +46,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedTex
         check_mail!(
             self,
             ctx,
-            match m {
+            match _ {
                 MakeupMessage::TextUpdate(text) => {
                     self.text = text.clone();
                 }
