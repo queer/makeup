@@ -125,7 +125,6 @@ mod tests {
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
-        post_office.send(root.key(), ());
 
         let mut ctx = UpdateContext {
             post_office: &mut post_office,
@@ -144,7 +143,6 @@ mod tests {
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
-        post_office.send(root.key(), ());
 
         let mut ctx = UpdateContext {
             post_office: &mut post_office,
@@ -163,7 +161,6 @@ mod tests {
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
-        post_office.send(root.key(), ());
 
         let mut ctx = UpdateContext {
             post_office: &mut post_office,
