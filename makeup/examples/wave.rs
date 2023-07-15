@@ -20,9 +20,9 @@ async fn main() -> Result<()> {
         ])
         .build()?;
     let mut root = Wave::new(gradient);
-    let mut renderer = TerminalRenderer::new();
+    let renderer = TerminalRenderer::new();
     let input = TerminalInput::new();
-    let mui = MUI::new(&mut root, &mut renderer, input);
+    let mui = MUI::new(&mut root, Box::new(renderer), input);
     mui.render(false).await?;
 
     Ok(())

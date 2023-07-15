@@ -111,7 +111,7 @@ mod tests {
     use super::TextInput;
     use crate::component::{MessageSender, UpdateContext};
     use crate::post_office::PostOffice;
-    use crate::{Component, DrawCommand};
+    use crate::{assert_renders_many, Component, DrawCommand};
 
     use eyre::Result;
     use makeup_console::Keypress;
@@ -121,16 +121,14 @@ mod tests {
         let mut root = TextInput::<()>::new("henol world");
         let mut post_office = PostOffice::<()>::new();
 
-        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
-        assert_eq!(
+        assert_renders_many!(
             vec![
                 DrawCommand::TextUnderCursor("henol world".into()),
                 DrawCommand::CharUnderCursor(':'),
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("".into())
-            ]
-            .as_slice(),
-            render.as_slice(),
+            ],
+            &root
         );
 
         post_office.send_makeup(
@@ -146,16 +144,14 @@ mod tests {
         })
         .await?;
 
-        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
-        assert_eq!(
+        assert_renders_many!(
             vec![
                 DrawCommand::TextUnderCursor("henol world".into()),
                 DrawCommand::CharUnderCursor(':'),
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("a".into())
-            ]
-            .as_slice(),
-            render.as_slice(),
+            ],
+            &root
         );
 
         Ok(())

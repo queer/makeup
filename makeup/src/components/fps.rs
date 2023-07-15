@@ -75,21 +75,16 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> 
 #[cfg(test)]
 mod tests {
     use super::Fps;
-    use crate::{Component, DrawCommand};
+    use crate::{assert_renders_one, static_text, Component};
 
     use eyre::Result;
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
         let root = Fps::<()>::new();
-
-        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
-        assert_eq!(
-            vec![DrawCommand::TextUnderCursor(
-                "FPS: 0.00 (effective: 0.00), dimensions: (0, 0), cursor (when this render started): (0, 0), last frame: 0ms, frame: 0".into(),
-            )]
-            .as_slice(),
-            render.as_slice(),
+        assert_renders_one!(
+            static_text!("FPS: 0.00 (effective: 0.00), dimensions: (0, 0), cursor (when this render started): (0, 0), last frame: 0ms, frame: 0"),
+            root
         );
 
         Ok(())

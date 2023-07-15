@@ -104,7 +104,7 @@ mod tests {
     use super::Spinner;
     use crate::component::{MakeupMessage, MessageSender, UpdateContext};
     use crate::post_office::PostOffice;
-    use crate::{Component, DrawCommand};
+    use crate::{assert_renders_many, Component, DrawCommand};
 
     use eyre::Result;
 
@@ -115,15 +115,13 @@ mod tests {
         let mut post_office = PostOffice::<()>::new();
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
 
-        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
-        assert_eq!(
+        assert_renders_many!(
             vec![
                 DrawCommand::CharUnderCursor('-'),
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
-            ]
-            .as_slice(),
-            render.as_slice(),
+            ],
+            &root
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
@@ -136,15 +134,13 @@ mod tests {
         };
         root.update_pass(&mut ctx).await?;
 
-        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
-        assert_eq!(
+        assert_renders_many!(
             vec![
                 DrawCommand::CharUnderCursor('\\'),
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
-            ]
-            .as_slice(),
-            render.as_slice(),
+            ],
+            &root
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
@@ -157,15 +153,13 @@ mod tests {
         };
         root.update_pass(&mut ctx).await?;
 
-        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
-        assert_eq!(
+        assert_renders_many!(
             vec![
                 DrawCommand::CharUnderCursor('|'),
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
-            ]
-            .as_slice(),
-            render.as_slice(),
+            ],
+            &root
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
@@ -178,15 +172,13 @@ mod tests {
         };
         root.update_pass(&mut ctx).await?;
 
-        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
-        assert_eq!(
+        assert_renders_many!(
             vec![
                 DrawCommand::CharUnderCursor('/'),
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
-            ]
-            .as_slice(),
-            render.as_slice(),
+            ],
+            &root
         );
 
         Ok(())

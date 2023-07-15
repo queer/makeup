@@ -85,27 +85,21 @@ mod tests {
     use crate::components::PositionedText;
     use crate::input::TerminalInput;
     use crate::render::MemoryRenderer;
-    use crate::{Renderer, MUI};
+    use crate::{make_test_ui, MUI};
 
     use eyre::Result;
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
         let mut root = PositionedText::<()>::new("henol world", 1, 1);
-
-        let mut renderer = MemoryRenderer::new(128, 128);
-        let input = TerminalInput::new();
-        let ui = MUI::new(&mut root, &mut renderer, input);
+        let ui = make_test_ui!(root);
         ui.render_once().await?;
 
-        renderer.move_cursor(0, 0).await?;
-        assert_eq!(" ", renderer.read_at_cursor(1).await?);
+        ui.move_cursor(0, 0).await?;
+        assert_eq!(" ", ui.read_at_cursor(1).await?);
 
-        renderer.move_cursor(1, 1).await?;
-        assert_eq!(
-            "henol world".to_string(),
-            renderer.read_at_cursor(11).await?
-        );
+        ui.move_cursor(1, 1).await?;
+        assert_eq!("henol world".to_string(), ui.read_at_cursor(11).await?);
 
         Ok(())
     }

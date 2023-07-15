@@ -75,19 +75,15 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
 #[cfg(test)]
 mod tests {
     use super::EchoText;
-    use crate::{Component, DrawCommand};
+    use crate::Component;
+    use crate::{assert_renders_one, static_text};
 
     use eyre::Result;
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
         let root = EchoText::<()>::new("henol world");
-
-        let (_k, render) = root.render(&crate::fake_render_ctx()).await?;
-        assert_eq!(
-            vec![DrawCommand::TextUnderCursor("henol world".into(),)].as_slice(),
-            render.as_slice(),
-        );
+        assert_renders_one!(static_text!("henol world"), root);
 
         Ok(())
     }

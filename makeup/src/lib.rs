@@ -13,6 +13,7 @@ pub mod components;
 pub mod input;
 pub mod post_office;
 pub mod render;
+pub mod test;
 pub mod ui;
 pub mod util;
 
@@ -64,31 +65,21 @@ pub enum DrawCommand {
 }
 
 #[cfg(test)]
-pub fn fake_render_ctx() -> component::RenderContext {
-    crate::component::RenderContext {
-        last_frame_time: None,
-        frame_counter: 0,
-        fps: 0f64,
-        effective_fps: 0f64,
-        cursor: (0, 0),
-        dimensions: (0, 0),
-        focus: 0,
-    }
-}
-
-#[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::component::{
         DrawCommandBatch, ExtractMessageFromComponent, Key, RenderContext, UpdateContext,
     };
     use crate::components::EchoText;
     use crate::input::TerminalInput;
     use crate::render::MemoryRenderer;
-    use crate::util::RwLocked;
-    use crate::{Component, DrawCommand, Renderer, MUI};
+    use crate::ui::RwLocked;
+    use crate::{Component, DrawCommand, MUI};
 
     use async_trait::async_trait;
     use eyre::Result;
+    use tokio::sync::RwLock;
 
     #[derive(Debug)]
     struct BasicComponent<'a> {
@@ -154,17 +145,14 @@ mod tests {
             key: crate::component::generate_key(),
         };
 
-        let mut renderer = MemoryRenderer::new(128, 128);
+        let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new();
-        let ui = MUI::new(&mut root, &mut renderer, input);
+        let ui = MUI::new(&mut root, Box::new(renderer), input);
         ui.render_once().await?;
         let expected = "henol world".to_string();
         ui.render_once().await?;
-        renderer.move_cursor(0, 0).await?;
-        assert_eq!(
-            expected,
-            renderer.read_at_cursor(expected.len() as u64).await?
-        );
+        ui.move_cursor(0, 0).await?;
+        assert_eq!(expected, ui.read_at_cursor(expected.len() as u64).await?);
 
         Ok(())
     }
@@ -175,21 +163,18 @@ mod tests {
 
         let mut root = BasicComponent {
             state: (),
-            children: vec![RwLocked::new(&mut child)],
+            children: vec![Arc::new(RwLock::new(&mut child))],
             key: crate::component::generate_key(),
         };
 
-        let mut renderer = MemoryRenderer::new(128, 128);
+        let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new();
-        let ui = MUI::new(&mut root, &mut renderer, input);
+        let ui = MUI::new(&mut root, Box::new(renderer), input);
         ui.render_once().await?;
 
         let expected = "henol world? wrong! banana".to_string();
-        renderer.move_cursor(0, 0).await?;
-        assert_eq!(
-            expected,
-            renderer.read_at_cursor(expected.len() as u64).await?
-        );
+        ui.move_cursor(0, 0).await?;
+        assert_eq!(expected, ui.read_at_cursor(expected.len() as u64).await?);
 
         Ok(())
     }

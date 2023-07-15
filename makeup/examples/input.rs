@@ -8,9 +8,9 @@ use eyre::Result;
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut root = TextInput::new("Type some text here");
-    let mut renderer = TerminalRenderer::new();
+    let renderer = TerminalRenderer::new();
     let input = TerminalInput::new();
-    let mui = MUI::<()>::new(&mut root, &mut renderer, input);
+    let mui = MUI::<()>::new(&mut root, Box::new(renderer), input);
     mui.render(false).await?;
 
     Ok(())

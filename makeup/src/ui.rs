@@ -7,7 +7,7 @@ use eyre::Result;
 use makeup_console::Keypress;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::Instant;
 
 use crate::component::{
@@ -15,7 +15,6 @@ use crate::component::{
 };
 use crate::input::{InputFrame, TerminalInput};
 use crate::post_office::PostOffice;
-use crate::util::RwLocked;
 use crate::{Ansi, Component, DisplayEraseMode, Input, Renderer};
 
 #[derive(Debug, Clone)]
@@ -30,6 +29,8 @@ pub enum RenderState {
     Stopped,
 }
 
+pub type RwLocked<T> = Arc<RwLock<T>>;
+
 /// A makeup UI. Generally used with [`crate::render::TerminalRenderer`].
 ///
 /// MUIs are supposed to be entirely async. Components are updated and rendered
@@ -43,7 +44,7 @@ pub struct MUI<
     I: Input + 'static = TerminalInput,
 > {
     ui: Arc<Mutex<UI<'a, M>>>,
-    renderer: RwLocked<&'a mut dyn Renderer>,
+    renderer: RwLocked<Box<dyn Renderer>>,
     input_tx: UnboundedSender<InputFrame>,
     input_rx: Arc<Mutex<UnboundedReceiver<InputFrame>>>,
     input: I,
@@ -54,14 +55,14 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
     /// Create a new makeup UI with the given root component and renderer.
     pub fn new(
         root: &'a mut dyn Component<Message = M>,
-        renderer: &'a mut dyn Renderer,
+        renderer: Box<dyn Renderer>,
         input: I,
     ) -> Self {
         let (input_tx, input_rx) = tokio::sync::mpsc::unbounded_channel();
 
         Self {
             ui: Arc::new(Mutex::new(UI::new(root))),
-            renderer: RwLocked::new(renderer),
+            renderer: Arc::new(RwLock::new(renderer)),
             input_tx,
             input_rx: Arc::new(Mutex::new(input_rx)),
             input,
@@ -278,8 +279,20 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
         ui.send_control(message).await;
     }
 
+    pub async fn move_cursor(&self, x: u64, y: u64) -> Result<()> {
+        let mut renderer = self.renderer.write().await;
+        renderer.move_cursor(x, y).await?;
+
+        Ok(())
+    }
+
+    pub async fn read_at_cursor(&self, count: u64) -> Result<String> {
+        let renderer = self.renderer.read().await;
+        renderer.read_at_cursor(count).await
+    }
+
     #[cfg(test)]
-    pub(crate) fn renderer(&self) -> &RwLocked<&'a mut dyn Renderer> {
+    pub(crate) fn renderer(&self) -> &RwLocked<Box<dyn Renderer>> {
         &self.renderer
     }
 
@@ -293,7 +306,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
 #[derive(Debug)]
 struct UI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
     root: Mutex<&'a mut dyn Component<Message = M>>,
-    post_office: Arc<RwLocked<PostOffice<M>>>,
+    post_office: RwLocked<PostOffice<M>>,
     focus: Key,
     components: Vec<Key>,
     exiting: bool,
@@ -306,7 +319,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         let components = Self::extract_ordered_keys(root);
         Self {
             root: Mutex::new(root),
-            post_office: Arc::new(RwLocked::new(PostOffice::new())),
+            post_office: Arc::new(RwLock::new(PostOffice::new())),
             focus: focus_key,
             components,
             exiting: false,
@@ -396,7 +409,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         component: &mut dyn Component<Message = M>,
         post_office: &mut PostOffice<M>,
         focus: Key,
-        post_office_lock: Arc<RwLocked<PostOffice<M>>>,
+        post_office_lock: RwLocked<PostOffice<M>>,
     ) -> Result<()> {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -540,9 +553,9 @@ mod tests {
         };
         let key = root.key();
 
-        let mut renderer = MemoryRenderer::new(128, 128);
+        let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new();
-        let ui = MUI::new(&mut root, &mut renderer, input);
+        let ui = MUI::new(&mut root, Box::new(renderer), input);
         ui.render_once().await?;
 
         {
@@ -568,9 +581,9 @@ mod tests {
         let mut root = EchoText::<String>::new("blep");
         let key = root.key();
 
-        let mut renderer = MemoryRenderer::new(128, 128);
+        let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new();
-        let ui = MUI::new(&mut root, &mut renderer, input);
+        let ui = MUI::new(&mut root, Box::new(renderer), input);
         ui.render_once().await?;
 
         assert_eq!(key, ui.focus().await);

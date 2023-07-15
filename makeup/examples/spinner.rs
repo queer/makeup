@@ -14,9 +14,9 @@ async fn main() -> Result<()> {
         vec!['-', '\\', '|', '/'],
         Duration::from_millis(100),
     );
-    let mut renderer = TerminalRenderer::new();
+    let renderer = TerminalRenderer::new();
     let input = TerminalInput::new();
-    let mui = MUI::<()>::new(&mut root, &mut renderer, input);
+    let mui = MUI::<()>::new(&mut root, Box::new(renderer), input);
     mui.render(false).await?;
 
     Ok(())
