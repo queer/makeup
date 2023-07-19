@@ -111,7 +111,8 @@ mod tests {
     use super::TextInput;
     use crate::component::{MessageSender, UpdateContext};
     use crate::post_office::PostOffice;
-    use crate::{assert_renders_many, Component, DrawCommand};
+    use crate::test::assert_renders_many;
+    use crate::{Component, DrawCommand};
 
     use eyre::Result;
     use makeup_console::Keypress;

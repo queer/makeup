@@ -88,6 +88,8 @@ impl Component for Wave {
     async fn render(&self, ctx: &RenderContext) -> Result<DrawCommandBatch> {
         let mut commands = vec![];
 
+        commands.push(DrawCommand::HideCursor);
+
         let mut colours = self.gradient.colors(ctx.dimensions.1 as usize - 1);
         let len = &colours.len();
         colours.rotate_right(self.step as usize * (len / 10));
@@ -117,6 +119,8 @@ impl Component for Wave {
             "{}fps ({:.2}fps effective), dimensions {:?}",
             ctx.fps, ctx.effective_fps, ctx.dimensions
         )));
+
+        commands.push(DrawCommand::ShowCursor);
 
         self.batch(commands)
     }

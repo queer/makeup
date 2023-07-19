@@ -32,7 +32,7 @@ pub type RelativeCoordinate = i64;
 
 /// Commands for drawing to the character grid. Draw commands are processed by
 /// the current [`Renderer`].
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, strum::Display)]
 pub enum DrawCommand {
     /// Draw text under the cursor, advancing the cursor by `text.len()`
     /// characters.
@@ -62,6 +62,12 @@ pub enum DrawCommand {
 
     /// Move the cursor absolutely.
     MoveCursorAbsolute { x: Coordinate, y: Coordinate },
+
+    /// Hide the cursor.
+    HideCursor,
+
+    /// Show the cursor.
+    ShowCursor,
 }
 
 #[cfg(test)]
@@ -74,6 +80,7 @@ mod tests {
     use crate::components::EchoText;
     use crate::input::TerminalInput;
     use crate::render::MemoryRenderer;
+    use crate::test::{assert_renders_many, static_text};
     use crate::ui::RwLocked;
     use crate::{Component, DrawCommand, MUI};
 
@@ -239,23 +246,23 @@ mod tests {
         Ok(())
     }
 
-    // #[tokio::test]
-    // async fn test_diff_works() -> Result<()> {
-    //     let root = LinesComponent {
-    //         state: (),
-    //         children: vec![],
-    //         key: crate::component::generate_key(),
-    //     };
+    #[tokio::test]
+    async fn test_diff_works() -> Result<()> {
+        let root = LinesComponent {
+            state: (),
+            children: vec![],
+            key: crate::component::generate_key(),
+        };
 
-    //     assert_renders_many!(
-    //         vec![
-    //             static_text!("line 1\n"),
-    //             static_text!("line 2\n"),
-    //             static_text!("line 3\n"),
-    //         ],
-    //         root
-    //     );
+        assert_renders_many!(
+            vec![
+                static_text!("line 1\n"),
+                static_text!("line 2\n"),
+                static_text!("line 3\n"),
+            ],
+            root
+        );
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }

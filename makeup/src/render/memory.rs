@@ -35,6 +35,7 @@ impl Renderer for MemoryRenderer {
                         // TODO: Newline detection
                         self.cursor_x += text_len;
                     }
+
                     DrawCommand::CharUnderCursor(c) => {
                         self.bounds_check(self.cursor_x, self.cursor_y)?;
                         self.bounds_check(self.cursor_x + 1, self.cursor_y)?;
@@ -46,6 +47,7 @@ impl Renderer for MemoryRenderer {
                             self.cursor_x += 1;
                         }
                     }
+
                     DrawCommand::EraseCurrentLine(mode) => match mode {
                         LineEraseMode::FromCursorToStart => {
                             for x in 0..self.cursor_x {
@@ -63,6 +65,7 @@ impl Renderer for MemoryRenderer {
                             }
                         }
                     },
+
                     DrawCommand::TextAt { x, y, text } => {
                         let text_len = text.len() as Dimension;
                         self.bounds_check(*x, *y)?;
@@ -73,6 +76,7 @@ impl Renderer for MemoryRenderer {
                         self.cursor_x = x + text_len;
                         self.cursor_y = *y;
                     }
+
                     DrawCommand::MoveCursorRelative { x, y } => {
                         let cursor_x = self.cursor_x as RelativeCoordinate;
                         let cursor_y = self.cursor_y as RelativeCoordinate;
@@ -81,11 +85,16 @@ impl Renderer for MemoryRenderer {
                         self.cursor_x = (cursor_x + x) as Coordinate;
                         self.cursor_y = (cursor_y + y) as Coordinate;
                     }
+
                     DrawCommand::MoveCursorAbsolute { x, y } => {
                         self.bounds_check(*x, *y)?;
                         self.cursor_x = *x;
                         self.cursor_y = *y;
                     }
+
+                    DrawCommand::HideCursor => {}
+
+                    DrawCommand::ShowCursor => {}
                 }
             }
         }

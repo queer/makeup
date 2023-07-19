@@ -83,9 +83,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for PositionedTex
 #[cfg(test)]
 mod tests {
     use crate::components::PositionedText;
-    use crate::input::TerminalInput;
-    use crate::render::MemoryRenderer;
-    use crate::{make_test_ui, MUI};
+    use crate::test::make_test_ui;
 
     use eyre::Result;
 

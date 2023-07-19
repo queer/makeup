@@ -2,7 +2,7 @@ use std::io::Write;
 
 use async_trait::async_trait;
 use eyre::Result;
-use makeup_ansi::DisplayEraseMode;
+use makeup_ansi::{CursorVisibility, DisplayEraseMode};
 
 use crate::component::DrawCommandBatch;
 use crate::{Ansi, DrawCommand};
@@ -61,16 +61,20 @@ impl Renderer for TerminalRenderer {
                     DrawCommand::TextUnderCursor(text) => {
                         buffer += text;
                     }
+
                     DrawCommand::CharUnderCursor(c) => {
                         buffer.push(*c);
                     }
+
                     DrawCommand::EraseCurrentLine(mode) => {
                         buffer += &Ansi::EraseInLine(mode.clone()).to_string();
                     }
+
                     DrawCommand::TextAt { x, y, text } => {
                         buffer += &Ansi::CursorPosition(*x, *y).to_string();
                         buffer += text;
                     }
+
                     DrawCommand::MoveCursorRelative { x, y } => {
                         match x.cmp(&0) {
                             std::cmp::Ordering::Less => {
@@ -92,8 +96,17 @@ impl Renderer for TerminalRenderer {
                             }
                         }
                     }
+
                     DrawCommand::MoveCursorAbsolute { x, y } => {
                         buffer += &Ansi::CursorPosition(*x, *y).to_string();
+                    }
+
+                    DrawCommand::HideCursor => {
+                        buffer += &Ansi::CursorVisibility(CursorVisibility::Invisible).to_string();
+                    }
+
+                    DrawCommand::ShowCursor => {
+                        buffer += &Ansi::CursorVisibility(CursorVisibility::Visible).to_string();
                     }
                 }
             }

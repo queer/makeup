@@ -104,7 +104,8 @@ mod tests {
     use super::Spinner;
     use crate::component::{MakeupMessage, MessageSender, UpdateContext};
     use crate::post_office::PostOffice;
-    use crate::{assert_renders_many, Component, DrawCommand};
+    use crate::test::assert_renders_many;
+    use crate::{Component, DrawCommand};
 
     use eyre::Result;
 

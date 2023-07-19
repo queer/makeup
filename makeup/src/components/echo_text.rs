@@ -75,8 +75,8 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
 #[cfg(test)]
 mod tests {
     use super::EchoText;
+    use crate::test::{assert_renders_one, static_text};
     use crate::Component;
-    use crate::{assert_renders_one, static_text};
 
     use eyre::Result;
 

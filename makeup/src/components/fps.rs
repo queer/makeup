@@ -75,7 +75,8 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> 
 #[cfg(test)]
 mod tests {
     use super::Fps;
-    use crate::{assert_renders_one, static_text, Component};
+    use crate::test::{assert_renders_one, static_text};
+    use crate::Component;
 
     use eyre::Result;
 
