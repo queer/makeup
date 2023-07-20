@@ -328,6 +328,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
     /// Render the entire UI.
     // TODO: Graceful error handling...
+    // TODO: Figure out parallel rendering
     pub(self) async fn render(
         &mut self,
         pending_input: &[Keypress],

@@ -80,7 +80,6 @@ mod tests {
     use crate::components::EchoText;
     use crate::input::TerminalInput;
     use crate::render::MemoryRenderer;
-    use crate::test::{assert_renders_many, static_text};
     use crate::ui::RwLocked;
     use crate::{Component, DrawCommand, MUI};
 
@@ -115,66 +114,6 @@ mod tests {
             Ok((
                 self.key,
                 vec![DrawCommand::TextUnderCursor("henol world".into())],
-            ))
-        }
-
-        async fn update_pass(
-            &mut self,
-            _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-        ) -> Result<()> {
-            Ok(())
-        }
-
-        async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
-            let mut out = vec![];
-            let render = self.render(ctx).await?;
-            out.push(render);
-
-            for child in &self.children {
-                let child = child.read().await;
-                let mut render = child.render_pass(ctx).await?;
-                out.append(&mut render);
-            }
-
-            Ok(out)
-        }
-
-        fn key(&self) -> Key {
-            self.key
-        }
-    }
-
-    #[derive(Debug)]
-    struct LinesComponent<'a> {
-        #[allow(dead_code)]
-        state: (),
-        children: Vec<RwLocked<&'a mut dyn Component<Message = ()>>>,
-        key: Key,
-    }
-
-    #[async_trait]
-    impl<'a> Component for LinesComponent<'a> {
-        type Message = ();
-
-        fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
-            None
-        }
-
-        async fn update(
-            &mut self,
-            _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-        ) -> Result<()> {
-            Ok(())
-        }
-
-        async fn render(&self, _ctx: &RenderContext) -> Result<DrawCommandBatch> {
-            Ok((
-                self.key,
-                vec![
-                    DrawCommand::TextUnderCursor("line 1\n".into()),
-                    DrawCommand::TextUnderCursor("line 2\n".into()),
-                    DrawCommand::TextUnderCursor("line 4\n".into()),
-                ],
             ))
         }
 
@@ -242,26 +181,6 @@ mod tests {
         let expected = "henol world? wrong! banana".to_string();
         ui.move_cursor(0, 0).await?;
         assert_eq!(expected, ui.read_at_cursor(expected.len() as u64).await?);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_diff_works() -> Result<()> {
-        let root = LinesComponent {
-            state: (),
-            children: vec![],
-            key: crate::component::generate_key(),
-        };
-
-        assert_renders_many!(
-            vec![
-                static_text!("line 1\n"),
-                static_text!("line 2\n"),
-                static_text!("line 3\n"),
-            ],
-            root
-        );
 
         Ok(())
     }

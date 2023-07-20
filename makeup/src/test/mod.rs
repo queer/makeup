@@ -21,15 +21,16 @@ macro_rules! __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_assert_renders_many {
         let (_key, actual) = $component.render(&ctx).await?;
 
         let diff = $crate::test::diff::DrawCommandDiff::new($expected, actual);
-
-        if !diff.is_empty() {
+        let diff: $crate::test::diff::VisualDiff = diff.into_visual_diff().await?;
+        if diff.is_different() {
             diff.render().await?;
-            let diff: $crate::test::diff::VisualDiff = diff.into();
-            diff.render().await?;
+            panic!();
         }
     }};
 }
 
+/// Given a set of draw commands, assert that they render the same thing. This
+/// will display a visual diff if they do not render the same thing.
 #[doc(inline)]
 pub use __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_assert_renders_many as assert_renders_many;
 
@@ -46,6 +47,15 @@ macro_rules! __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_assert_renders_one {
 #[doc(inline)]
 pub use __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_assert_renders_one as assert_renders_one;
 
+/// Create a test UI with a fake renderer and input.
+///
+/// Usage:
+///
+/// ```ignore
+/// let ui = make_test_ui!(root_component);
+/// let ui = make_test_ui!(root_component, 128); // both dimensions
+/// let ui = make_test_ui!(root_component, 256, 64); // width, height
+/// ```
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_make_test_ui {
@@ -55,6 +65,28 @@ macro_rules! __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_make_test_ui {
         use $crate::MUI;
 
         let renderer = MemoryRenderer::new(128, 128);
+        let input = TerminalInput::new();
+        let ui = MUI::new(&mut $root, Box::new(renderer), input);
+        ui
+    }};
+
+    ($root:expr, $size:expr) => {{
+        use $crate::input::TerminalInput;
+        use $crate::render::MemoryRenderer;
+        use $crate::MUI;
+
+        let renderer = MemoryRenderer::new($size, $size);
+        let input = TerminalInput::new();
+        let ui = MUI::new(&mut $root, Box::new(renderer), input);
+        ui
+    }};
+
+    ($root:expr, $w:expr, $h:expr) => {{
+        use $crate::input::TerminalInput;
+        use $crate::render::MemoryRenderer;
+        use $crate::MUI;
+
+        let renderer = MemoryRenderer::new($w, $h);
         let input = TerminalInput::new();
         let ui = MUI::new(&mut $root, Box::new(renderer), input);
         ui

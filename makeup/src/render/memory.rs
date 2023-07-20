@@ -17,6 +17,54 @@ pub struct MemoryRenderer {
     text: std::collections::HashMap<Coordinates, char>,
 }
 
+impl MemoryRenderer {
+    pub fn new(width: Dimension, height: Dimension) -> MemoryRenderer {
+        MemoryRenderer {
+            cursor_x: 0,
+            cursor_y: 0,
+            width,
+            height,
+            text: std::collections::HashMap::new(),
+        }
+    }
+
+    // TODO: Should we just be truncating instead?
+    fn bounds_check(&self, x: Coordinate, y: Coordinate) -> Result<()> {
+        if x < self.width && y < self.height {
+            Ok(())
+        } else {
+            Err(RenderError::OutOfBounds(x as RelativeCoordinate, y as RelativeCoordinate).into())
+        }
+    }
+
+    fn bounds_check_relative(&self, x: RelativeCoordinate, y: RelativeCoordinate) -> Result<()> {
+        if x < self.width as RelativeCoordinate
+            && y < self.height as RelativeCoordinate
+            && x >= 0
+            && y >= 0
+        {
+            Ok(())
+        } else {
+            Err(RenderError::OutOfBounds(x, y).into())
+        }
+    }
+
+    fn insert_char(&mut self, c: char) -> Result<()> {
+        if c == '\n' {
+            self.bounds_check(0, self.cursor_y + 1)?;
+            self.cursor_x = 0;
+            self.cursor_y += 1;
+        } else {
+            self.bounds_check(self.cursor_x, self.cursor_y)?;
+            self.bounds_check(self.cursor_x + 1, self.cursor_y)?;
+            self.text.insert((self.cursor_x, self.cursor_y), c);
+            self.cursor_x += 1;
+        }
+
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl Renderer for MemoryRenderer {
     async fn render(&mut self, commands: &[DrawCommandBatch]) -> Result<()> {
@@ -25,27 +73,13 @@ impl Renderer for MemoryRenderer {
             for command in commands {
                 match command {
                     DrawCommand::TextUnderCursor(text) => {
-                        let text_len = text.len() as Dimension;
-                        self.bounds_check(self.cursor_x, self.cursor_y)?;
-                        self.bounds_check(self.cursor_x + text_len, self.cursor_y)?;
-                        for (i, c) in text.chars().enumerate() {
-                            self.text
-                                .insert((self.cursor_x + (i as Dimension), self.cursor_y), c);
+                        for (_i, c) in text.chars().enumerate() {
+                            self.insert_char(c)?;
                         }
-                        // TODO: Newline detection
-                        self.cursor_x += text_len;
                     }
 
                     DrawCommand::CharUnderCursor(c) => {
-                        self.bounds_check(self.cursor_x, self.cursor_y)?;
-                        self.bounds_check(self.cursor_x + 1, self.cursor_y)?;
-                        self.text.insert((self.cursor_x, self.cursor_y), *c);
-                        if *c == '\n' {
-                            self.cursor_x = 0;
-                            self.cursor_y += 1;
-                        } else {
-                            self.cursor_x += 1;
-                        }
+                        self.insert_char(*c)?;
                     }
 
                     DrawCommand::EraseCurrentLine(mode) => match mode {
@@ -154,38 +188,5 @@ impl Renderer for MemoryRenderer {
 
     fn set_height(&mut self, height: Dimension) {
         self.height = height;
-    }
-}
-
-impl MemoryRenderer {
-    pub fn new(width: Dimension, height: Dimension) -> MemoryRenderer {
-        MemoryRenderer {
-            cursor_x: 0,
-            cursor_y: 0,
-            width,
-            height,
-            text: std::collections::HashMap::new(),
-        }
-    }
-
-    // TODO: Should we just be truncating instead?
-    fn bounds_check(&self, x: Coordinate, y: Coordinate) -> Result<()> {
-        if x < self.width && y < self.height {
-            Ok(())
-        } else {
-            Err(RenderError::OutOfBounds(x as RelativeCoordinate, y as RelativeCoordinate).into())
-        }
-    }
-
-    fn bounds_check_relative(&self, x: RelativeCoordinate, y: RelativeCoordinate) -> Result<()> {
-        if x < self.width as RelativeCoordinate
-            && y < self.height as RelativeCoordinate
-            && x >= 0
-            && y >= 0
-        {
-            Ok(())
-        } else {
-            Err(RenderError::OutOfBounds(x, y).into())
-        }
     }
 }
