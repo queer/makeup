@@ -13,7 +13,7 @@ categories = ["development-tools"]
 
 [dependencies]
 proc-macro2 = "1.0.64"
-quote = "1.0.29"
+quote = "1.0.30"
 syn = "2.0.26"
 
 [lib]
