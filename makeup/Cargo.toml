@@ -33,7 +33,7 @@ version = "0.0.2"
 
 [dependencies.makeup-console]
 path = "../makeup-console"
-version = "0.0.3"
+version = "0.0.4"
 
 [dependencies.makeup-macros]
 path = "../makeup-macros"

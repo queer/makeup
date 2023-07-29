@@ -245,7 +245,7 @@ dependencies = [
 
 [[package]]
 name = "makeup-console"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "async-recursion",
  "eyre",
