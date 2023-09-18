@@ -21,7 +21,7 @@ rand = "0.8.5"
 thiserror = "1.0.48"
 tokio = { version = "1.32.0", features = ["full"] }
 libc = "0.2.148"
-indoc = "2.0.3"
+indoc = "2.0.4"
 strum = { version = "0.25.0", features = ["derive"] }
 
 [dev-dependencies]
