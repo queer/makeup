@@ -1,3 +1,4 @@
+use std::os::fd::BorrowedFd;
 use std::os::unix::prelude::AsRawFd;
 use std::time::Duration;
 
@@ -60,10 +61,14 @@ use tokio::fs::File;
 ///     - If stdin is a terminal, return None
 /// - Disable TCSADRAIN
 pub async fn next_keypress() -> Result<Option<Keypress>> {
-    let fd = if isatty(libc::STDIN_FILENO)? {
-        libc::STDIN_FILENO
-    } else {
-        File::open("/dev/tty").await?.as_raw_fd()
+    // Safety: It's impossible for these to not be valid fds
+    // TODO: We *do* hold for appropriate lengths of time, right?
+    let fd = unsafe {
+        BorrowedFd::borrow_raw(if isatty(libc::STDIN_FILENO)? {
+            std::io::stdin().as_raw_fd()
+        } else {
+            File::open("/dev/tty").await?.as_raw_fd()
+        })
     };
 
     let original_termios = termios::tcgetattr(fd)?;
@@ -85,7 +90,7 @@ pub async fn next_keypress() -> Result<Option<Keypress>> {
         | termios::LocalFlags::IEXTEN);
     termios::tcsetattr(fd, termios::SetArg::TCSADRAIN, &termios)?;
 
-    let out = read_next_key(fd).await;
+    let out = read_next_key(&fd).await;
 
     termios::tcsetattr(fd, termios::SetArg::TCSADRAIN, &original_termios)?;
 
@@ -93,7 +98,7 @@ pub async fn next_keypress() -> Result<Option<Keypress>> {
 }
 
 #[async_recursion]
-async fn read_next_key(fd: std::os::unix::io::RawFd) -> Result<Option<Keypress>> {
+async fn read_next_key(fd: &BorrowedFd<'_>) -> Result<Option<Keypress>> {
     match read_char(fd)? {
         Some('\x1b') => match read_char(fd)? {
             Some('[') => match read_char(fd)? {
@@ -161,7 +166,7 @@ async fn read_next_key(fd: std::os::unix::io::RawFd) -> Result<Option<Keypress>>
         }
         None => {
             // there is no subsequent byte ready to be read, block and wait for input
-            let pollfd = PollFd::new(fd, PollFlags::POLLIN);
+            let pollfd = PollFd::new(&fd, PollFlags::POLLIN);
             let ret = poll(&mut [pollfd], 0)?;
 
             if ret < 0 {
@@ -179,7 +184,7 @@ async fn read_next_key(fd: std::os::unix::io::RawFd) -> Result<Option<Keypress>>
     }
 }
 
-fn read_byte(fd: std::os::unix::io::RawFd) -> Result<Option<u8>> {
+fn read_byte(fd: &BorrowedFd<'_>) -> Result<Option<u8>> {
     let mut buf = [0u8; 1];
     let mut read_fds = FdSet::new();
     read_fds.insert(fd);
@@ -190,7 +195,7 @@ fn read_byte(fd: std::os::unix::io::RawFd) -> Result<Option<u8>> {
     signals.add(Signal::SIGKILL);
 
     match nix::sys::select::pselect(
-        fd + 1,
+        fd.as_raw_fd() + 1,
         Some(&mut read_fds),
         Some(&mut FdSet::new()),
         Some(&mut FdSet::new()),
@@ -201,7 +206,7 @@ fn read_byte(fd: std::os::unix::io::RawFd) -> Result<Option<u8>> {
         Some(&signals),
     ) {
         Ok(0) => Ok(None),
-        Ok(_) => match nix::unistd::read(fd, &mut buf) {
+        Ok(_) => match nix::unistd::read(fd.as_raw_fd(), &mut buf) {
             Ok(0) => Ok(None),
             Ok(_) => Ok(Some(buf[0])),
             Err(err) => Err(err.into()),
@@ -210,7 +215,7 @@ fn read_byte(fd: std::os::unix::io::RawFd) -> Result<Option<u8>> {
     }
 }
 
-fn read_char(fd: std::os::unix::io::RawFd) -> Result<Option<char>> {
+fn read_char(fd: &BorrowedFd<'_>) -> Result<Option<char>> {
     read_byte(fd).map(|byte| byte.map(|byte| byte as char))
 }
 
