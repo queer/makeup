@@ -23,7 +23,6 @@ tokio = { version = "1.32.0", features = ["full"] }
 libc = "0.2.148"
 indoc = "2.0.4"
 strum = { version = "0.25.0", features = ["derive"] }
-xxhash-rust = { version = "0.8.7", features = ["xxh3"] }
 
 [dev-dependencies]
 colorgrad = "0.6.2"
