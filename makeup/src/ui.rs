@@ -49,6 +49,7 @@ pub struct MUI<
     input_rx: Arc<Mutex<UnboundedReceiver<InputFrame>>>,
     input: I,
     done: Arc<Mutex<bool>>,
+    // last_commands_hash: Option<u64>,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M, I> {
@@ -67,6 +68,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
             input_rx: Arc::new(Mutex::new(input_rx)),
             input,
             done: Arc::new(Mutex::new(false)),
+            // last_commands_hash: None,
         }
     }
 
@@ -248,6 +250,23 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
         let commands = ui.render(pending_input, ctx).await?;
 
         let mut renderer = self.renderer.write().await;
+
+        // TODO: Better hashing usage
+        // let commands_hashable_bytes: Vec<u8> = commands
+        //     .iter()
+        //     .flat_map(|(key, _)| key.to_le_bytes())
+        //     .collect();
+
+        // let command_hash = xxhash_rust::xxh3::xxh3_64(&commands_hashable_bytes);
+        // if let Some(hash) = self.last_commands_hash {
+        //     // Exit early if there's no need to keep rendering, ie draw commands hash to the same output
+        //     if hash == command_hash {
+        //         return Ok(ui.exiting);
+        //     }
+        // } else {
+        //     self.last_commands_hash = Some(command_hash);
+        // }
+
         renderer.render(&commands).await?;
         renderer.flush().await?;
 
