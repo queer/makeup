@@ -14,6 +14,20 @@ use nix::sys::time::TimeSpec;
 use nix::unistd::isatty;
 use tokio::fs::File;
 
+#[derive(Debug, Clone)] // TODO: Are clone bounds safe here?
+pub struct ConsoleState<'a>(#[doc(hidden)] BorrowedFd<'a>);
+
+pub async fn init() -> Result<ConsoleState<'static>> {
+    // Safety: It's impossible for these to not be valid fds
+    Ok(ConsoleState(unsafe {
+        BorrowedFd::borrow_raw(if isatty(libc::STDIN_FILENO)? {
+            std::io::stdin().as_raw_fd()
+        } else {
+            File::open("/dev/tty").await?.as_raw_fd()
+        })
+    }))
+}
+
 /// - Check if stdin is a terminal (libc::isatty == 1)
 ///   - If not, open /dev/tty
 /// - Put the terminal in raw input mode
@@ -60,18 +74,8 @@ use tokio::fs::File;
 ///   - Else, if no byte to read:
 ///     - If stdin is a terminal, return None
 /// - Disable TCSADRAIN
-pub async fn next_keypress() -> Result<Option<Keypress>> {
-    // Safety: It's impossible for these to not be valid fds
-    // TODO: We *do* hold for appropriate lengths of time, right?
-    let fd = unsafe {
-        BorrowedFd::borrow_raw(if isatty(libc::STDIN_FILENO)? {
-            std::io::stdin().as_raw_fd()
-        } else {
-            File::open("/dev/tty").await?.as_raw_fd()
-        })
-    };
-
-    let original_termios = termios::tcgetattr(fd)?;
+pub async fn next_keypress(state: &ConsoleState<'static>) -> Result<Option<Keypress>> {
+    let original_termios = termios::tcgetattr(state.0)?;
     let mut termios = original_termios.clone();
 
     // Note: This is ONLY what termios::cfmakeraw does to input
@@ -88,11 +92,11 @@ pub async fn next_keypress() -> Result<Option<Keypress>> {
         | termios::LocalFlags::ICANON
         | termios::LocalFlags::ISIG
         | termios::LocalFlags::IEXTEN);
-    termios::tcsetattr(fd, termios::SetArg::TCSADRAIN, &termios)?;
+    termios::tcsetattr(state.0, termios::SetArg::TCSADRAIN, &termios)?;
 
-    let out = read_next_key(&fd).await;
+    let out = read_next_key(&state.0).await;
 
-    termios::tcsetattr(fd, termios::SetArg::TCSADRAIN, &original_termios)?;
+    termios::tcsetattr(state.0, termios::SetArg::TCSADRAIN, &original_termios)?;
 
     out
 }

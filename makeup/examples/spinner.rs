@@ -15,7 +15,7 @@ async fn main() -> Result<()> {
         Duration::from_millis(100),
     );
     let renderer = TerminalRenderer::new();
-    let input = TerminalInput::new();
+    let input = TerminalInput::new().await?;
     let mui = MUI::<()>::new(&mut root, Box::new(renderer), input);
     mui.render(false).await?;
 

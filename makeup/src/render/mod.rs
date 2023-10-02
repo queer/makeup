@@ -67,7 +67,7 @@ mod tests {
         let mut root = EchoText::<()>::new("henol world");
 
         let renderer = MemoryRenderer::new(128, 128);
-        let input = TerminalInput::new();
+        let input = TerminalInput::new().await?;
         let ui = MUI::new(&mut root, Box::new(renderer), input);
         ui.render_once().await?;
 

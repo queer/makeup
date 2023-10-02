@@ -13,7 +13,7 @@ use makeup::ui::{RenderState, UiControlMessage};
 async fn main() -> Result<()> {
     let mut root = Fps::new();
     let renderer = TerminalRenderer::new();
-    let input = TerminalInput::new();
+    let input = TerminalInput::new().await?;
     let mui = Arc::new(MUI::<()>::new(&mut root, Box::new(renderer), input));
     let stop_mui = mui.clone();
 

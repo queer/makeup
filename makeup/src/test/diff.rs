@@ -79,7 +79,7 @@ impl DrawCommandDiff {
             use crate::MUI;
 
             let renderer = TerminalRenderer::new();
-            let input = TerminalInput::new();
+            let input = TerminalInput::new().await?;
             let ui = MUI::new(&mut data, Box::new(renderer), input);
             ui
         };
@@ -285,7 +285,7 @@ impl VisualDiff {
                 use crate::MUI;
 
                 let renderer = TerminalRenderer::new();
-                let input = TerminalInput::new();
+                let input = TerminalInput::new().await?;
                 let ui = MUI::new(&mut data, Box::new(renderer), input);
                 ui
             };

@@ -9,7 +9,7 @@ use eyre::Result;
 async fn main() -> Result<()> {
     let mut root = EchoText::new("hello, world!");
     let renderer = TerminalRenderer::new();
-    let input = TerminalInput::new();
+    let input = TerminalInput::new().await?;
     let mui = MUI::<()>::new(&mut root, Box::new(renderer), input);
     mui.render_once().await?;
 

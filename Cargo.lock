@@ -223,7 +223,7 @@ dependencies = [
 
 [[package]]
 name = "makeup"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -251,7 +251,7 @@ dependencies = [
 
 [[package]]
 name = "makeup-console"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "async-recursion",
  "eyre",
