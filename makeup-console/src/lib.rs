@@ -1,4 +1,4 @@
-use std::os::fd::BorrowedFd;
+use std::os::fd::{BorrowedFd, RawFd};
 use std::os::unix::prelude::AsRawFd;
 use std::time::Duration;
 
@@ -17,11 +17,13 @@ use tokio::fs::File;
 #[derive(Debug, Clone)] // TODO: Are clone bounds safe here?
 pub struct ConsoleState<'a>(#[doc(hidden)] BorrowedFd<'a>);
 
-pub async fn init() -> Result<ConsoleState<'static>> {
+pub async fn init(fd: Option<RawFd>) -> Result<ConsoleState<'static>> {
     // Safety: It's impossible for these to not be valid fds
     Ok(ConsoleState(unsafe {
-        BorrowedFd::borrow_raw(if isatty(libc::STDIN_FILENO)? {
-            std::io::stdin().as_raw_fd()
+        BorrowedFd::borrow_raw(if fd.is_some() {
+            fd.unwrap()
+        } else if isatty(libc::STDIN_FILENO)? {
+            std::io::stderr().as_raw_fd()
         } else {
             File::open("/dev/tty").await?.as_raw_fd()
         })

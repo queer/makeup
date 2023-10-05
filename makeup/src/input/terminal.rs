@@ -13,7 +13,7 @@ pub struct TerminalInput {
 impl TerminalInput {
     pub async fn new() -> Result<Self> {
         Ok(Self {
-            state: makeup_console::init().await?,
+            state: makeup_console::init(None).await?,
         })
     }
 }
