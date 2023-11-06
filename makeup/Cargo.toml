@@ -16,7 +16,7 @@ async-recursion = "1.0.5"
 async-trait = "0.1.74"
 either = "1.9.0"
 eyre = "0.6.8"
-futures-util = "0.3.28"
+futures-util = "0.3.29"
 rand = "0.8.5"
 thiserror = "1.0.50"
 tokio = { version = "1.33.0", features = ["full"] }
