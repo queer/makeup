@@ -20,7 +20,7 @@ futures-util = "0.3.28"
 rand = "0.8.5"
 thiserror = "1.0.50"
 tokio = { version = "1.33.0", features = ["full"] }
-libc = "0.2.149"
+libc = "0.2.150"
 indoc = "2.0.4"
 strum = { version = "0.25.0", features = ["derive"] }
 
