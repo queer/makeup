@@ -15,7 +15,7 @@ use crate::component::{
 };
 use crate::input::{InputFrame, TerminalInput};
 use crate::post_office::PostOffice;
-use crate::{Ansi, Component, Dimensions, DisplayEraseMode, Input, Renderer};
+use crate::{Ansi, Component, Coordinates, Dimensions, DisplayEraseMode, Input, Renderer};
 
 #[derive(Debug, Clone)]
 pub enum UiControlMessage {
@@ -92,9 +92,6 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
             print!("{}", Ansi::EraseInDisplay(DisplayEraseMode::All));
         }
 
-        let fps_target = 60;
-        let one_second_in_micros = Duration::from_secs(1).as_micros();
-        let frame_target = Duration::from_micros((one_second_in_micros as u64) / fps_target);
         let mut last_frame_time = None;
         let mut last_fps: f64 = 0f64;
         let mut effective_fps: f64 = 0f64;
@@ -134,79 +131,44 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
             })
         };
 
-        'render_loop: loop {
-            let start = Instant::now();
-
-            let mut render_context = RenderContext {
-                last_frame_time,
-                frame_counter,
-                fps: last_fps,
-                effective_fps,
-                cursor,
-                dimensions,
-                // Default values, these are filled in by the inner render method.
-                focus: 0,
-            };
-
-            let mut pending_input = vec![];
-            let mut rx = self.input_rx.lock().await;
-
-            loop {
-                match rx.try_recv() {
-                    Ok(InputFrame::Frame(key)) => {
-                        pending_input.push(key);
+        'run_loop: loop {
+            tokio::select! {
+                update_res = self.update_loop() => {
+                    if update_res.is_err() {
+                        {
+                            let mut done = self.done.lock().await;
+                            *done = true;
+                        }
                     }
-                    Ok(InputFrame::Empty) => {}
-                    Ok(InputFrame::End) => {
-                        break 'render_loop;
-                    }
-                    Err(TryRecvError::Disconnected) => {
-                        eprintln!("Error: Input disconnected!?");
-                        break 'render_loop;
-                    }
-                    Err(TryRecvError::Empty) => {
-                        break;
+                }
+                render_res = self.render_loop(
+                    &mut last_frame_time,
+                    &mut frame_counter,
+                    &mut last_fps,
+                    &mut effective_fps,
+                    &cursor,
+                    &dimensions,
+                ) => {
+                    let currently_exiting = match render_res {
+                        Ok(exiting) => exiting,
+                        Err(_e) => true,
+                    };
+                    if currently_exiting {
+                        {
+                            let mut done = self.done.lock().await;
+                            *done = true;
+                        }
                     }
                 }
             }
 
-            self.update(&pending_input).await?;
-
-            let currently_exiting = match self.render_frame(&mut render_context).await {
-                Ok(exiting) => exiting,
-                Err(e) => {
-                    // TODO: Handle gracefully
-                    eprintln!("Error: {e}");
-                    break 'render_loop;
-                }
-            };
-
-            self.flush_renderer().await?;
-
-            frame_counter += 1;
-
-            let elapsed = start.elapsed();
-            last_frame_time = Some(elapsed);
-            effective_fps = (one_second_in_micros as f64) / (elapsed.as_micros() as f64);
-            last_fps = if effective_fps as u64 > fps_target {
-                fps_target as f64
-            } else {
-                effective_fps
-            };
-
-            if let Some(duration) = frame_target.checked_sub(elapsed) {
-                tokio::time::sleep(duration).await
-            } else {
-                // log::warn!("Frame took too long to render: {:?}", elapsed);
-            }
-
-            if currently_exiting {
-                {
-                    let mut done = self.done.lock().await;
-                    *done = true;
-                }
+            let done = *self.done.lock().await;
+            if done {
+                // We have to render one last time to ensure that the cursor
+                // ends up in the expected position.
+                self.render_once().await?;
                 input_handle.abort();
-                break 'render_loop;
+                break 'run_loop;
             }
         }
 
@@ -217,6 +179,90 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
 
         self.flush_renderer().await?;
         Ok(RenderState::Stopped)
+    }
+
+    async fn update_loop(&'a self) -> Result<()> {
+        let mut pending_input = vec![];
+        let mut rx = self.input_rx.lock().await;
+
+        loop {
+            match rx.try_recv() {
+                Ok(InputFrame::Frame(key)) => {
+                    pending_input.push(key);
+                }
+                Ok(InputFrame::Empty) => {}
+                Ok(InputFrame::End) => {
+                    return Err(eyre::eyre!("input closed!"));
+                }
+                Err(TryRecvError::Disconnected) => {
+                    eprintln!("error: Input disconnected!?");
+                    return Err(eyre::eyre!("input disconnected!"));
+                }
+                Err(TryRecvError::Empty) => {
+                    break;
+                }
+            }
+        }
+
+        self.update(&pending_input).await.expect("update failed!");
+
+        Ok(())
+    }
+
+    async fn render_loop(
+        &'a self,
+        last_frame_time: &mut Option<Duration>,
+        frame_counter: &mut u128,
+        last_fps: &mut f64,
+        effective_fps: &mut f64,
+        cursor: &Coordinates,
+        dimensions: &Dimensions,
+    ) -> Result<bool> {
+        let start = Instant::now();
+        let fps_target = 60;
+        let one_second_in_micros = Duration::from_secs(1).as_micros();
+        let frame_target = Duration::from_micros((one_second_in_micros as u64) / fps_target);
+
+        let mut render_context = RenderContext {
+            last_frame_time: *last_frame_time,
+            frame_counter: *frame_counter,
+            fps: *last_fps,
+            effective_fps: *effective_fps,
+            cursor: *cursor,
+            dimensions: *dimensions,
+            // Default values, these are filled in by the inner render method.
+            focus: 0,
+        };
+
+        let currently_exiting = match self.render_frame(&mut render_context).await {
+            Ok(exiting) => exiting,
+            Err(e) => {
+                // TODO: Handle gracefully
+                eprintln!("Error: {e}");
+                return Err(e);
+            }
+        };
+
+        self.flush_renderer().await?;
+
+        *frame_counter += 1;
+
+        let elapsed = start.elapsed();
+        *last_frame_time = Some(elapsed);
+        *effective_fps = (one_second_in_micros as f64) / (elapsed.as_micros() as f64);
+        *last_fps = if *effective_fps as u64 > fps_target {
+            fps_target as f64
+        } else {
+            *effective_fps
+        };
+
+        if let Some(duration) = frame_target.checked_sub(elapsed) {
+            tokio::time::sleep(duration).await
+        } else {
+            // log::warn!("Frame took too long to render: {:?}", elapsed);
+        }
+
+        Ok(currently_exiting)
     }
 
     pub async fn update(&'a self, pending_input: &[Keypress]) -> Result<()> {
