@@ -9,12 +9,12 @@ categories = ["command-line-interface"]
 keywords = ["console"]
 
 [dependencies]
-tokio = { version = "1.32.0", features = ["full"] }
+tokio = { version = "1.33.0", features = ["full"] }
 eyre = "0.6.8"
 nix = { version = "0.27.1", features = ["poll", "signal", "term", "fs"] }
-libc = "0.2.148"
+libc = "0.2.150"
 async-recursion = "1.0.5"
-thiserror = "1.0.49"
+thiserror = "1.0.50"
 
 [dependencies.makeup-ansi]
 path = "../makeup-ansi"
