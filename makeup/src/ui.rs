@@ -170,15 +170,16 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
                 }
             }
 
-            let currently_exiting =
-                match self.render_frame(&pending_input, &mut render_context).await {
-                    Ok(exiting) => exiting,
-                    Err(e) => {
-                        // TODO: Handle gracefully
-                        eprintln!("Error: {e}");
-                        break 'render_loop;
-                    }
-                };
+            self.update(&pending_input).await?;
+
+            let currently_exiting = match self.render_frame(&mut render_context).await {
+                Ok(exiting) => exiting,
+                Err(e) => {
+                    // TODO: Handle gracefully
+                    eprintln!("Error: {e}");
+                    break 'render_loop;
+                }
+            };
 
             self.flush_renderer().await?;
 
@@ -218,6 +219,14 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
         Ok(RenderState::Stopped)
     }
 
+    pub async fn update(&'a self, pending_input: &[Keypress]) -> Result<()> {
+        let dimensions = { self.renderer.read().await.dimensions() };
+        let mut ui = self.ui.lock().await;
+        ui.update(pending_input, dimensions).await?;
+
+        Ok(())
+    }
+
     pub async fn render_once(&'a self) -> Result<RenderState> {
         let mut ctx = {
             let renderer = self.renderer.read().await;
@@ -232,7 +241,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
             }
         };
 
-        self.render_frame(&[], &mut ctx).await?;
+        self.render_frame(&mut ctx).await?;
 
         Ok(RenderState::Running)
     }
@@ -242,13 +251,9 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
     /// fast as possible.
     ///
     /// Returns whether or not the UI is currently stopping.
-    async fn render_frame(
-        &'a self,
-        pending_input: &[Keypress],
-        ctx: &mut RenderContext,
-    ) -> Result<bool> {
+    async fn render_frame(&'a self, ctx: &mut RenderContext) -> Result<bool> {
         let mut ui = self.ui.lock().await;
-        let commands = ui.render(pending_input, ctx).await?;
+        let commands = ui.render(ctx).await?;
 
         let mut renderer = self.renderer.write().await;
         renderer.render(&commands).await?;
@@ -331,16 +336,12 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         }
     }
 
-    /// Render the entire UI.
-    // TODO: Graceful error handling...
-    // TODO: Figure out parallel rendering
-    pub(self) async fn render(
+    pub(self) async fn update(
         &mut self,
         pending_input: &[Keypress],
-        ctx: &mut RenderContext,
-    ) -> Result<Vec<DrawCommandBatch>> {
+        render_dimensions: Dimensions,
+    ) -> Result<()> {
         let mut post_office = self.post_office.write().await;
-        // let mut root = self.root.lock().await;
 
         for message in post_office.ui_mailbox() {
             match message {
@@ -356,7 +357,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
         Self::mail_pending_input(pending_input, &mut post_office, self.focus);
         Self::update_recursive(
-            ctx.dimensions,
+            render_dimensions,
             self.root.as_mut(),
             &mut post_office,
             self.focus,
@@ -364,6 +365,13 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         )
         .await?;
 
+        Ok(())
+    }
+
+    /// Render the entire UI.
+    // TODO: Graceful error handling...
+    // TODO: Figure out parallel rendering
+    pub(self) async fn render(&mut self, ctx: &mut RenderContext) -> Result<Vec<DrawCommandBatch>> {
         let render_tree = Self::extract_ordered_keys(self.root.as_ref());
         let mut added = vec![];
         let mut removed = vec![];
@@ -560,6 +568,7 @@ mod tests {
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
         let ui = MUI::new(Box::new(root), Box::new(renderer), input);
+        ui.update(&[]).await?;
         ui.render_once().await?;
 
         {
@@ -569,6 +578,7 @@ mod tests {
         }
 
         ui.send(key, PingMessage::Ping).await;
+        ui.update(&[]).await?;
         ui.render_once().await?;
 
         {
@@ -588,12 +598,12 @@ mod tests {
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
         let ui = MUI::new(Box::new(root), Box::new(renderer), input);
-        ui.render_once().await?;
+        ui.update(&[]).await?;
 
         assert_eq!(key, ui.focus().await);
 
         ui.send_control(UiControlMessage::MoveFocus(0)).await;
-        ui.render_once().await?;
+        ui.update(&[]).await?;
 
         assert_eq!(0, ui.focus().await);
 
