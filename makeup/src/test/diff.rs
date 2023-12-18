@@ -71,7 +71,7 @@ impl DrawCommandDiff {
             ));
         }
 
-        let mut data = EchoText::<()>::new(data);
+        let data = EchoText::<()>::new(data);
 
         let ui = {
             use crate::input::TerminalInput;
@@ -80,7 +80,7 @@ impl DrawCommandDiff {
 
             let renderer = TerminalRenderer::new();
             let input = TerminalInput::new().await?;
-            let ui = MUI::new(&mut data, Box::new(renderer), input);
+            let ui = MUI::new(Box::new(data), Box::new(renderer), input);
             ui
         };
         ui.render_once().await?;
@@ -208,21 +208,44 @@ impl VisualDiff {
                 let actual_chars: Vec<char> = actual_lines[i].chars().collect();
                 let mut last_position = 0;
                 for range in different_ranges {
-                    let up_to_range: String = actual_chars[last_position..range.0].iter().collect();
-                    last_position = range.1;
-                    let range: String = actual_chars[range.0..range.1].iter().collect();
+                    if range.0 >= actual_chars.len() {
+                        // If the range exists outside of the actual line, then
+                        // we need to render red past the end of the line but
+                        // without any actual text
+                        let padding = " ".repeat(range.1 - range.0);
+                        let up_to_range: String =
+                            actual_chars[0..actual_chars.len()].iter().collect();
+                        last_position = actual_chars.len();
+                        write!(
+                            &mut rendered_diff,
+                            "{reset}{up_to_range}{red}{padding}{reset}",
+                            red = makeup_ansi::Ansi::Sgr(vec![
+                                makeup_ansi::SgrParameter::HexBackgroundColour(0xFF0000)
+                            ]),
+                            reset = makeup_ansi::Ansi::Sgr(vec![makeup_ansi::SgrParameter::Reset]),
+                        )?;
+                    } else {
+                        let up_to_range: String =
+                            actual_chars[last_position..range.0].iter().collect();
+                        last_position = std::cmp::min(range.1, actual_chars.len());
 
-                    write!(
-                        &mut rendered_diff,
-                        "{}{}{}{}{}",
-                        makeup_ansi::Ansi::Sgr(vec![makeup_ansi::SgrParameter::Reset]),
-                        up_to_range,
-                        makeup_ansi::Ansi::Sgr(vec![
-                            makeup_ansi::SgrParameter::HexBackgroundColour(0xFF0000)
-                        ]),
-                        range,
-                        makeup_ansi::Ansi::Sgr(vec![makeup_ansi::SgrParameter::Reset]),
-                    )?;
+                        let padding = if last_position < range.1 {
+                            " ".repeat(range.1 - last_position)
+                        } else {
+                            String::new()
+                        };
+
+                        let range: String = actual_chars[range.0..last_position].iter().collect();
+
+                        write!(
+                            &mut rendered_diff,
+                            "{reset}{up_to_range}{red}{range}{padding}{reset}",
+                            reset = makeup_ansi::Ansi::Sgr(vec![makeup_ansi::SgrParameter::Reset]),
+                            red = makeup_ansi::Ansi::Sgr(vec![
+                                makeup_ansi::SgrParameter::HexBackgroundColour(0xFF0000)
+                            ]),
+                        )?;
+                    }
                 }
 
                 let up_to_range: String = actual_chars[last_position..].iter().collect();
@@ -277,7 +300,7 @@ impl VisualDiff {
 
     pub async fn render(&self) -> Result<()> {
         if self.is_different {
-            let mut data = EchoText::<()>::new(&self.rendered_diff);
+            let data = EchoText::<()>::new(&self.rendered_diff);
 
             let ui = {
                 use crate::input::TerminalInput;
@@ -286,7 +309,7 @@ impl VisualDiff {
 
                 let renderer = TerminalRenderer::new();
                 let input = TerminalInput::new().await?;
-                let ui = MUI::new(&mut data, Box::new(renderer), input);
+                let ui = MUI::new(Box::new(data), Box::new(renderer), input);
                 ui
             };
             ui.render_once().await?;
@@ -305,12 +328,10 @@ mod tests {
     use async_trait::async_trait;
     use eyre::Result;
 
-    use crate::component::{
-        DrawCommandBatch, ExtractMessageFromComponent, Key, RenderContext, UpdateContext,
-    };
+    use crate::component::{DrawCommandBatch, Key, MakeupUpdate, RenderContext};
     use crate::test::{assert_renders_many, static_text};
     use crate::ui::RwLocked;
-    use crate::{Component, DrawCommand};
+    use crate::{Component, Dimensions, DrawCommand};
 
     #[derive(Debug)]
     struct LinesComponent<'a> {
@@ -328,10 +349,7 @@ mod tests {
             None
         }
 
-        async fn update(
-            &mut self,
-            _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-        ) -> Result<()> {
+        async fn update(&mut self, _ctx: &mut MakeupUpdate<Self>) -> Result<()> {
             Ok(())
         }
 
@@ -348,10 +366,7 @@ mod tests {
             ))
         }
 
-        async fn update_pass(
-            &mut self,
-            _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-        ) -> Result<()> {
+        async fn update_pass(&mut self, _ctx: &mut MakeupUpdate<Self>) -> Result<()> {
             Ok(())
         }
 
@@ -371,6 +386,10 @@ mod tests {
 
         fn key(&self) -> Key {
             self.key
+        }
+
+        fn dimensions(&self) -> Result<Dimensions> {
+            unimplemented!()
         }
     }
 

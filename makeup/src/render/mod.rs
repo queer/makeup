@@ -64,11 +64,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
-        let mut root = EchoText::<()>::new("henol world");
+        let root = EchoText::<()>::new("henol world");
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(&mut root, Box::new(renderer), input);
+        let ui = MUI::new(Box::new(root), Box::new(renderer), input);
         ui.render_once().await?;
 
         ui.move_cursor(0, 0).await?;

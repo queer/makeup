@@ -1,14 +1,11 @@
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
-use either::Either;
 use eyre::Result;
 use makeup_ansi::LineEraseMode;
 use makeup_console::Keypress;
 
-use crate::component::{
-    DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
-};
+use crate::component::{DrawCommandBatch, Key, MakeupMessage, MakeupUpdate, RenderContext};
 use crate::{check_mail, Component, DrawCommand};
 
 /// A simple component that renders text under the cursor.
@@ -41,10 +38,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
         None
     }
 
-    async fn update(
-        &mut self,
-        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()> {
+    async fn update(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
         let mut offset = 0i32;
         check_mail!(
             self,
@@ -90,10 +84,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
         }
     }
 
-    async fn update_pass(
-        &mut self,
-        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()> {
+    async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
         self.update(ctx).await
     }
 
@@ -103,6 +94,11 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
 
     fn key(&self) -> Key {
         self.key
+    }
+
+    fn dimensions(&self) -> Result<(u64, u64)> {
+        // +2 comes from the `: ` between the prompt and the buffer.
+        Ok((self.prompt.len() as u64 + 2 + self.buffer.len() as u64, 1))
     }
 }
 
@@ -142,6 +138,7 @@ mod tests {
             post_office: &mut post_office,
             sender: MessageSender::new(tx.clone(), root.key()),
             focus: root.key(),
+            dimensions: (100, 100),
         })
         .await?;
 

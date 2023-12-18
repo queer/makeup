@@ -11,10 +11,10 @@ use makeup::ui::{RenderState, UiControlMessage};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut root = Fps::new();
+    let root = Fps::new();
     let renderer = TerminalRenderer::new();
     let input = TerminalInput::new().await?;
-    let mui = Arc::new(MUI::<()>::new(&mut root, Box::new(renderer), input));
+    let mui = Arc::new(MUI::<()>::new(Box::new(root), Box::new(renderer), input));
     let stop_mui = mui.clone();
 
     'outer: loop {

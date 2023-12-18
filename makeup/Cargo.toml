@@ -23,6 +23,8 @@ tokio = { version = "1.32.0", features = ["full"] }
 libc = "0.2.148"
 indoc = "2.0.4"
 strum = { version = "0.25.0", features = ["derive"] }
+taffy = "0.3.18"
+derivative = "2.2.0"
 
 [dev-dependencies]
 colorgrad = "0.6.2"

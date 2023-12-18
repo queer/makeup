@@ -47,10 +47,18 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> PostOffice<Message> {
 
     /// Get the mailbox for the given component.
     pub fn mailbox<C: Component<Message = Message> + ?Sized>(
-        &mut self,
+        &self,
         component: &C,
-    ) -> Option<&mut Mailbox<C>> {
-        self.boxes.get_mut(&component.key())
+    ) -> Option<&Mailbox<C>> {
+        self.boxes.get(&component.key())
+    }
+
+    #[inline]
+    #[doc(hidden)]
+    pub fn clear_mailbox<C: Component<Message = Message> + ?Sized>(&mut self, component: &C) {
+        if let Some(mailbox) = self.boxes.get_mut(&component.key()) {
+            mailbox.clear();
+        }
     }
 
     /// Get the UI message queue.
@@ -95,10 +103,11 @@ macro_rules! check_mail {
     ( $component:expr, $ctx:expr, $arms:expr ) => {{
         if let Some(mailbox) = $ctx.post_office.mailbox($component) {
             for message in mailbox.iter() {
+                use either::Either;
                 (makeup_macros::__do_check_mail_arms!($arms))
             }
 
-            mailbox.clear();
+            $ctx.post_office.clear_mailbox($component);
         }
     }};
 }

@@ -20,8 +20,8 @@ pub struct ConsoleState<'a>(#[doc(hidden)] BorrowedFd<'a>);
 pub async fn init(fd: Option<RawFd>) -> Result<ConsoleState<'static>> {
     // Safety: It's impossible for these to not be valid fds
     Ok(ConsoleState(unsafe {
-        BorrowedFd::borrow_raw(if fd.is_some() {
-            fd.unwrap()
+        BorrowedFd::borrow_raw(if let Some(fd) = fd {
+            fd
         } else if isatty(libc::STDIN_FILENO)? {
             std::io::stderr().as_raw_fd()
         } else {

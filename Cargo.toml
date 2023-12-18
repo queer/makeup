@@ -1,7 +1,3 @@
 [workspace]
-members = [
-  "makeup-ansi",
-  "makeup-console",
-  "makeup-macros",
-  "makeup",
-]
+resolver = "2"
+members = ["makeup-ansi", "makeup-console", "makeup-macros", "makeup"]

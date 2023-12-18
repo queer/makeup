@@ -2,10 +2,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use colorgrad::Gradient;
-use either::Either;
-use makeup::component::{
-    DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
-};
+use makeup::component::{DrawCommandBatch, Key, MakeupMessage, MakeupUpdate, RenderContext};
 use makeup::input::TerminalInput;
 use makeup::render::terminal::TerminalRenderer;
 use makeup::{check_mail, Ansi, Component, DrawCommand, LineEraseMode, SgrParameter, MUI};
@@ -19,10 +16,10 @@ async fn main() -> Result<()> {
             "#FFB3BA", "#FFDFBA", "#FFFFBA", "#BAFFC9", "#BAE1FF", "#D0BAFF", "#FFBAF2", "#FFB3BA",
         ])
         .build()?;
-    let mut root = Wave::new(gradient);
+    let root = Wave::new(gradient);
     let renderer = TerminalRenderer::new();
     let input = TerminalInput::new().await?;
-    let mui = MUI::new(&mut root, Box::new(renderer), input);
+    let mui = MUI::new(Box::new(root), Box::new(renderer), input);
     mui.render(false).await?;
 
     Ok(())
@@ -57,10 +54,7 @@ impl Component for Wave {
         None
     }
 
-    async fn update(
-        &mut self,
-        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()> {
+    async fn update(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
         let sender = ctx.sender.clone();
         if !self.started {
             self.started = true;
@@ -125,10 +119,7 @@ impl Component for Wave {
         self.batch(commands)
     }
 
-    async fn update_pass(
-        &mut self,
-        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()> {
+    async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
         self.update(ctx).await
     }
 
@@ -138,5 +129,9 @@ impl Component for Wave {
 
     fn key(&self) -> Key {
         self.key
+    }
+
+    fn dimensions(&self) -> Result<(u64, u64)> {
+        Ok((0, 0))
     }
 }

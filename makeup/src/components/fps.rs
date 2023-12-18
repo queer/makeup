@@ -3,10 +3,8 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use eyre::Result;
 
-use crate::component::{
-    DrawCommandBatch, ExtractMessageFromComponent, Key, RenderContext, UpdateContext,
-};
-use crate::{Component, DrawCommand};
+use crate::component::{DrawCommandBatch, Key, MakeupUpdate, RenderContext};
+use crate::{Component, Dimensions, DrawCommand};
 
 /// A simple component that renders text under the cursor.
 #[derive(Debug)]
@@ -33,10 +31,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> 
         None
     }
 
-    async fn update(
-        &mut self,
-        _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()> {
+    async fn update(&mut self, _ctx: &mut MakeupUpdate<Self>) -> Result<()> {
         Ok(())
     }
 
@@ -56,10 +51,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> 
         )
     }
 
-    async fn update_pass(
-        &mut self,
-        _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()> {
+    async fn update_pass(&mut self, _ctx: &mut MakeupUpdate<Self>) -> Result<()> {
         Ok(())
     }
 
@@ -69,6 +61,10 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> 
 
     fn key(&self) -> Key {
         self.key
+    }
+
+    fn dimensions(&self) -> Result<Dimensions> {
+        Ok((0, 0))
     }
 }
 

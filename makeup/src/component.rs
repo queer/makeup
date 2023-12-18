@@ -32,6 +32,8 @@ pub type Mailbox<C> = Vec<ComponentMessage<C>>;
 /// during the [`Component::update_pass`] loop.
 pub type ContextTx<M> = UnboundedSender<(Key, RawComponentMessage<M>)>;
 
+pub type MakeupUpdate<'a, C> = UpdateContext<'a, ExtractMessageFromComponent<C>>;
+
 /// The context for a component's update lifecycle.
 #[derive(Debug)]
 pub struct UpdateContext<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> {
@@ -41,14 +43,22 @@ pub struct UpdateContext<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static>
     pub sender: MessageSender<M>,
     /// The [`Key`] of the currently-focused component.
     pub focus: Key,
+    /// The dimensions of the character grid.
+    pub dimensions: Dimensions,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UpdateContext<'a, M> {
-    pub fn new(post_office: &'a mut PostOffice<M>, sender: ContextTx<M>, focus: Key) -> Self {
+    pub fn new(
+        post_office: &'a mut PostOffice<M>,
+        sender: ContextTx<M>,
+        focus: Key,
+        dimensions: Dimensions,
+    ) -> Self {
         Self {
             post_office,
             sender: MessageSender::new(sender, focus),
             focus,
+            dimensions,
         }
     }
 
@@ -57,6 +67,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UpdateContext<'a, M
     }
 }
 
+// TODO: Figure out update propagation so that containers recalculate layout when children change
 /// A helper for components to use for message-sending during the update loop.
 /// These functions are not on the [`UpdateContext`] itself because the
 /// `sender` needs to be able to be moved across threads with a `'static`
@@ -186,10 +197,7 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     /// Process any messages that have been sent to this component. Messages
     /// are expected to be process asynchronously, ie. any long-running
     /// operations should be [`tokio::spawn`]ed as a task.
-    async fn update(
-        &mut self,
-        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()>;
+    async fn update(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()>;
 
     /// Render this component.
     async fn render(&self, ctx: &RenderContext) -> Result<DrawCommandBatch>;
@@ -197,10 +205,7 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     /// An update pass for this component. Generally, this is implemented by
     /// calling [`Self::update`] and calling `::update` on any child
     /// components.
-    async fn update_pass(
-        &mut self,
-        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()>;
+    async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()>;
 
     /// A render pass for this component. Generally, this is implemented by
     /// invoking `self.render()` and then calling `render` on each child.
@@ -213,6 +218,11 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     fn batch(&self, commands: Vec<DrawCommand>) -> Result<DrawCommandBatch> {
         Ok((self.key(), commands))
     }
+
+    /// The dimensions of this component. Coordinates are calculated
+    /// automatically by the parent component that manages layout, or are
+    /// implied by render order.
+    fn dimensions(&self) -> Result<Dimensions>;
 }
 
 /// Generate a most-likely-unique key for a component.

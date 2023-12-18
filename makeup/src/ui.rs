@@ -15,7 +15,7 @@ use crate::component::{
 };
 use crate::input::{InputFrame, TerminalInput};
 use crate::post_office::PostOffice;
-use crate::{Ansi, Component, DisplayEraseMode, Input, Renderer};
+use crate::{Ansi, Component, Dimensions, DisplayEraseMode, Input, Renderer};
 
 #[derive(Debug, Clone)]
 pub enum UiControlMessage {
@@ -54,7 +54,7 @@ pub struct MUI<
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M, I> {
     /// Create a new makeup UI with the given root component and renderer.
     pub fn new(
-        root: &'a mut dyn Component<Message = M>,
+        root: Box<dyn Component<Message = M>>,
         renderer: Box<dyn Renderer>,
         input: I,
     ) -> Self {
@@ -219,14 +219,17 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
     }
 
     pub async fn render_once(&'a self) -> Result<RenderState> {
-        let mut ctx = RenderContext {
-            last_frame_time: None,
-            frame_counter: 0,
-            fps: 0f64,
-            effective_fps: 0f64,
-            cursor: (0, 0),
-            dimensions: (0, 0),
-            focus: 0,
+        let mut ctx = {
+            let renderer = self.renderer.read().await;
+            RenderContext {
+                last_frame_time: None,
+                frame_counter: 0,
+                fps: 0f64,
+                effective_fps: 0f64,
+                cursor: renderer.cursor(),
+                dimensions: renderer.dimensions(),
+                focus: 0,
+            }
         };
 
         self.render_frame(&[], &mut ctx).await?;
@@ -305,24 +308,26 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
 
 #[derive(Debug)]
 struct UI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
-    root: Mutex<&'a mut dyn Component<Message = M>>,
+    root: Box<dyn Component<Message = M>>,
     post_office: RwLocked<PostOffice<M>>,
     focus: Key,
     components: Vec<Key>,
     exiting: bool,
+    _phantom: std::marker::PhantomData<&'a ()>,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
     /// Build a new `UI` from the given root component.
-    pub(self) fn new(root: &'a mut dyn Component<Message = M>) -> Self {
+    pub(self) fn new(root: Box<dyn Component<Message = M>>) -> Self {
         let focus_key = root.key();
-        let components = Self::extract_ordered_keys(root);
+        let components = Self::extract_ordered_keys(root.as_ref());
         Self {
-            root: Mutex::new(root),
+            root,
             post_office: Arc::new(RwLock::new(PostOffice::new())),
             focus: focus_key,
             components,
             exiting: false,
+            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -335,7 +340,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         ctx: &mut RenderContext,
     ) -> Result<Vec<DrawCommandBatch>> {
         let mut post_office = self.post_office.write().await;
-        let mut root = self.root.lock().await;
+        // let mut root = self.root.lock().await;
 
         for message in post_office.ui_mailbox() {
             match message {
@@ -351,14 +356,15 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
         Self::mail_pending_input(pending_input, &mut post_office, self.focus);
         Self::update_recursive(
-            *root,
+            ctx.dimensions,
+            self.root.as_mut(),
             &mut post_office,
             self.focus,
             self.post_office.clone(),
         )
         .await?;
 
-        let render_tree = Self::extract_ordered_keys(*root);
+        let render_tree = Self::extract_ordered_keys(self.root.as_ref());
         let mut added = vec![];
         let mut removed = vec![];
 
@@ -378,7 +384,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
         // TODO: Figure out not needing to mutate the ctx
         ctx.focus = self.focus;
-        let draw_commands = root.render_pass(ctx).await?;
+        let draw_commands = self.root.render_pass(ctx).await?;
         Ok(draw_commands)
     }
 
@@ -407,6 +413,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
     #[async_recursion]
     async fn update_recursive(
+        render_dimensions: Dimensions,
         component: &mut dyn Component<Message = M>,
         post_office: &mut PostOffice<M>,
         focus: Key,
@@ -418,6 +425,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
             post_office: &mut *post_office,
             sender: MessageSender::new(tx.clone(), focus),
             focus,
+            dimensions: render_dimensions,
         };
 
         (*component).update_pass(&mut pending_update).await?;
@@ -466,56 +474,50 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
 #[cfg(test)]
 mod tests {
-    use crate::component::{
-        DrawCommandBatch, ExtractMessageFromComponent, Key, RenderContext, UpdateContext,
-    };
+    use crate::component::{DrawCommandBatch, Key, MakeupUpdate, RenderContext};
     use crate::components::EchoText;
     use crate::input::TerminalInput;
     use crate::render::MemoryRenderer;
     use crate::ui::UiControlMessage;
-    use crate::{Component, DrawCommand, MUI};
+    use crate::{check_mail, Component, Dimensions, DrawCommand, MUI};
 
     use async_trait::async_trait;
-    use either::Either;
     use eyre::Result;
 
     #[derive(Debug)]
-    struct PingableComponent<'a> {
+    struct PingableComponent {
         #[allow(dead_code)]
         state: (),
         key: Key,
         was_pinged: bool,
-        children: Vec<&'a mut dyn Component<Message = String>>,
+        children: Vec<Box<dyn Component<Message = PingMessage>>>,
+    }
+
+    #[derive(Debug, Clone)]
+    enum PingMessage {
+        Ping,
     }
 
     #[async_trait]
-    impl<'a> Component for PingableComponent<'a> {
-        type Message = String;
+    impl Component for PingableComponent {
+        type Message = PingMessage;
 
         fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
-            let mut out = vec![];
-
-            for child in &self.children {
-                out.push(&**child);
-            }
-
-            Some(out)
+            Some(self.children.iter().map(|c| c.as_ref()).collect())
         }
 
-        async fn update(
-            &mut self,
-            ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-        ) -> Result<()> {
-            if let Some(mailbox) = ctx.post_office.mailbox(self) {
-                for msg in mailbox.iter() {
-                    if let Either::Left(cmd) = msg {
-                        if cmd == "ping" {
-                            self.was_pinged = true;
-                        }
+        async fn update(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
+            use crate::ui::MakeupMessage;
+            check_mail!(
+                self,
+                ctx,
+                match _ {
+                    MakeupMessage::TextUpdate(_) => {}
+                    PingMessage::Ping => {
+                        self.was_pinged = true;
                     }
                 }
-                mailbox.clear();
-            }
+            );
 
             Ok(())
         }
@@ -528,10 +530,7 @@ mod tests {
             }
         }
 
-        async fn update_pass(
-            &mut self,
-            ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-        ) -> Result<()> {
+        async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
             self.update(ctx).await
         }
 
@@ -542,11 +541,15 @@ mod tests {
         fn key(&self) -> Key {
             self.key
         }
+
+        fn dimensions(&self) -> Result<Dimensions> {
+            unimplemented!()
+        }
     }
 
     #[tokio::test]
     async fn test_messaging_works() -> Result<()> {
-        let mut root = PingableComponent {
+        let root = PingableComponent {
             state: (),
             key: crate::component::generate_key(),
             was_pinged: false,
@@ -556,7 +559,7 @@ mod tests {
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(&mut root, Box::new(renderer), input);
+        let ui = MUI::new(Box::new(root), Box::new(renderer), input);
         ui.render_once().await?;
 
         {
@@ -565,7 +568,7 @@ mod tests {
             assert_eq!("ping?".to_string(), renderer.read_at_cursor(5).await?);
         }
 
-        ui.send(key, "ping".into()).await;
+        ui.send(key, PingMessage::Ping).await;
         ui.render_once().await?;
 
         {
@@ -579,12 +582,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_ui_messaging_works() -> Result<()> {
-        let mut root = EchoText::<String>::new("blep");
+        let root = EchoText::<String>::new("blep");
         let key = root.key();
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(&mut root, Box::new(renderer), input);
+        let ui = MUI::new(Box::new(root), Box::new(renderer), input);
         ui.render_once().await?;
 
         assert_eq!(key, ui.focus().await);

@@ -1,13 +1,10 @@
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
-use either::Either;
 use eyre::Result;
 
-use crate::component::{
-    DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
-};
-use crate::{check_mail, Component, DrawCommand};
+use crate::component::{DrawCommandBatch, Key, MakeupMessage, MakeupUpdate, RenderContext};
+use crate::{check_mail, Component, Dimensions, DrawCommand};
 
 /// A simple component that renders text under the cursor.
 #[derive(Debug)]
@@ -35,10 +32,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
         None
     }
 
-    async fn update(
-        &mut self,
-        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()> {
+    async fn update(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
         check_mail!(
             self,
             ctx,
@@ -56,10 +50,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
         self.batch(vec![DrawCommand::TextUnderCursor(self.text.clone())])
     }
 
-    async fn update_pass(
-        &mut self,
-        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()> {
+    async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
         self.update(ctx).await
     }
 
@@ -69,6 +60,10 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
 
     fn key(&self) -> Key {
         self.key
+    }
+
+    fn dimensions(&self) -> Result<Dimensions> {
+        Ok((self.text.len() as u64, 1))
     }
 }
 

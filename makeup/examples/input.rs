@@ -7,10 +7,10 @@ use eyre::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut root = TextInput::new("Type some text here");
+    let root = TextInput::new("Type some text here");
     let renderer = TerminalRenderer::new();
     let input = TerminalInput::new().await?;
-    let mui = MUI::<()>::new(&mut root, Box::new(renderer), input);
+    let mui = MUI::<()>::new(Box::new(root), Box::new(renderer), input);
     mui.render(false).await?;
 
     Ok(())

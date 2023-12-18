@@ -2,13 +2,10 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use either::Either;
 use eyre::Result;
 
-use crate::component::{
-    DrawCommandBatch, ExtractMessageFromComponent, Key, MakeupMessage, RenderContext, UpdateContext,
-};
-use crate::{check_mail, Component, DrawCommand};
+use crate::component::{DrawCommandBatch, Key, MakeupMessage, MakeupUpdate, RenderContext};
+use crate::{check_mail, Component, Dimensions, DrawCommand};
 
 /// A simple component that renders a spinner with the given text.
 #[derive(Debug)]
@@ -44,10 +41,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
         None
     }
 
-    async fn update(
-        &mut self,
-        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()> {
+    async fn update(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
         if !self.started {
             ctx.sender
                 .send_makeup_message(self.key(), MakeupMessage::TimerTick(self.interval))?;
@@ -81,10 +75,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
         ])
     }
 
-    async fn update_pass(
-        &mut self,
-        ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-    ) -> Result<()> {
+    async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
         self.update(ctx).await
     }
 
@@ -94,6 +85,11 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
 
     fn key(&self) -> Key {
         self.key
+    }
+
+    fn dimensions(&self) -> Result<Dimensions> {
+        // +2 comes from the space and spinner character
+        Ok((self.text.len() as u64 + 2, 1))
     }
 }
 
@@ -131,6 +127,7 @@ mod tests {
             post_office: &mut post_office,
             sender: MessageSender::new(tx.clone(), root.key()),
             focus: root.key(),
+            dimensions: (100, 100),
         };
         root.update_pass(&mut ctx).await?;
 
@@ -149,6 +146,7 @@ mod tests {
             post_office: &mut post_office,
             sender: MessageSender::new(tx.clone(), root.key()),
             focus: root.key(),
+            dimensions: (100, 100),
         };
         root.update_pass(&mut ctx).await?;
 
@@ -167,6 +165,7 @@ mod tests {
             post_office: &mut post_office,
             sender: MessageSender::new(tx.clone(), root.key()),
             focus: root.key(),
+            dimensions: (100, 100),
         };
         root.update_pass(&mut ctx).await?;
 

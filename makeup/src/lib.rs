@@ -72,41 +72,32 @@ pub enum DrawCommand {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use crate::component::{
-        DrawCommandBatch, ExtractMessageFromComponent, Key, RenderContext, UpdateContext,
-    };
+    use crate::component::{DrawCommandBatch, Key, MakeupUpdate, RenderContext};
     use crate::components::EchoText;
     use crate::input::TerminalInput;
     use crate::render::MemoryRenderer;
-    use crate::ui::RwLocked;
-    use crate::{Component, DrawCommand, MUI};
+    use crate::{Component, Dimensions, DrawCommand, MUI};
 
     use async_trait::async_trait;
     use eyre::Result;
-    use tokio::sync::RwLock;
 
     #[derive(Debug)]
-    struct BasicComponent<'a> {
+    struct BasicComponent {
         #[allow(dead_code)]
         state: (),
-        children: Vec<RwLocked<&'a mut dyn Component<Message = ()>>>,
+        children: Vec<Box<dyn Component<Message = ()>>>,
         key: Key,
     }
 
     #[async_trait]
-    impl<'a> Component for BasicComponent<'a> {
+    impl Component for BasicComponent {
         type Message = ();
 
         fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
             None
         }
 
-        async fn update(
-            &mut self,
-            _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-        ) -> Result<()> {
+        async fn update(&mut self, _ctx: &mut MakeupUpdate<Self>) -> Result<()> {
             Ok(())
         }
 
@@ -117,10 +108,7 @@ mod tests {
             ))
         }
 
-        async fn update_pass(
-            &mut self,
-            _ctx: &mut UpdateContext<ExtractMessageFromComponent<Self>>,
-        ) -> Result<()> {
+        async fn update_pass(&mut self, _ctx: &mut MakeupUpdate<Self>) -> Result<()> {
             Ok(())
         }
 
@@ -130,7 +118,6 @@ mod tests {
             out.push(render);
 
             for child in &self.children {
-                let child = child.read().await;
                 let mut render = child.render_pass(ctx).await?;
                 out.append(&mut render);
             }
@@ -141,11 +128,15 @@ mod tests {
         fn key(&self) -> Key {
             self.key
         }
+
+        fn dimensions(&self) -> Result<Dimensions> {
+            unimplemented!()
+        }
     }
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
-        let mut root = BasicComponent {
+        let root = BasicComponent {
             state: (),
             children: vec![],
             key: crate::component::generate_key(),
@@ -153,7 +144,7 @@ mod tests {
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(&mut root, Box::new(renderer), input);
+        let ui = MUI::new(Box::new(root), Box::new(renderer), input);
         ui.render_once().await?;
         let expected = "henol world".to_string();
         ui.render_once().await?;
@@ -165,17 +156,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_it_renders_children() -> Result<()> {
-        let mut child = EchoText::new("? wrong! banana!");
+        let child = EchoText::new("? wrong! banana!");
 
-        let mut root = BasicComponent {
+        let root = BasicComponent {
             state: (),
-            children: vec![Arc::new(RwLock::new(&mut child))],
+            children: vec![Box::new(child)],
             key: crate::component::generate_key(),
         };
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(&mut root, Box::new(renderer), input);
+        let ui = MUI::new(Box::new(root), Box::new(renderer), input);
         ui.render_once().await?;
 
         let expected = "henol world? wrong! banana".to_string();

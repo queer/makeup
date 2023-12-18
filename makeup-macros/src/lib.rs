@@ -20,18 +20,20 @@ pub fn __do_check_mail_arms(input: proc_macro::TokenStream) -> proc_macro::Token
                 // Otherwise, put it in the left arm.
 
                 let is_makeup_message = match &pattern {
-                    syn::Pat::Ident(ref pat_ident) => {
-                        pat_ident.ident.to_string().starts_with("MakeupMessage")
-                    }
+                    syn::Pat::TupleStruct(ref pat_tuple_struct) => pat_tuple_struct.path.segments
+                        [0]
+                    .ident
+                    .to_string()
+                    .starts_with("MakeupMessage"),
                     _ => false,
                 };
 
                 if is_makeup_message {
-                    left_patterns.push(pattern.clone());
-                    left_arms.push(handler);
-                } else {
                     right_patterns.push(pattern.clone());
                     right_arms.push(handler);
+                } else {
+                    left_patterns.push(pattern.clone());
+                    left_arms.push(handler);
                 }
             }
         }
