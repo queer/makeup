@@ -110,7 +110,7 @@ impl Component for Wave {
             LineEraseMode::FromCursorToEnd,
         ));
         commands.push(DrawCommand::TextUnderCursor(format!(
-            "{}fps ({:.2}fps effective), dimensions {:?}",
+            "{:.2}fps ({:.2}fps effective), dimensions {:?}",
             ctx.fps, ctx.effective_fps, ctx.dimensions
         )));
 

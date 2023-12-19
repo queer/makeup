@@ -195,7 +195,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Container<Mes
             let mut next_batch = self.render_recursive(child.as_ref(), ctx).await?;
             batches.append(&mut next_batch);
         }
-        Ok((self.key, batches))
+        self.batch(batches)
     }
 
     async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {

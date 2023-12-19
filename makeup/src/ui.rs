@@ -166,7 +166,17 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
             if done {
                 // We have to render one last time to ensure that the cursor
                 // ends up in the expected position.
-                self.render_once().await?;
+                self.render_frame(&mut RenderContext {
+                    last_frame_time,
+                    frame_counter,
+                    fps: last_fps,
+                    effective_fps,
+                    cursor,
+                    dimensions,
+                    // Default values, these are filled in by the inner render method.
+                    focus: 0,
+                })
+                .await?;
                 input_handle.abort();
                 break 'run_loop;
             }
@@ -268,7 +278,11 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
     pub async fn update(&'a self, pending_input: &[Keypress]) -> Result<()> {
         let dimensions = { self.renderer.read().await.dimensions() };
         let mut ui = self.ui.lock().await;
-        ui.update(pending_input, dimensions).await?;
+        let exiting = ui.update(pending_input, dimensions).await?;
+        if exiting {
+            let mut done = self.done.lock().await;
+            *done = true;
+        }
 
         Ok(())
     }
@@ -386,7 +400,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         &mut self,
         pending_input: &[Keypress],
         render_dimensions: Dimensions,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let mut post_office = self.post_office.write().await;
 
         for message in post_office.ui_mailbox() {
@@ -411,7 +425,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         )
         .await?;
 
-        Ok(())
+        Ok(self.exiting)
     }
 
     /// Render the entire UI.
