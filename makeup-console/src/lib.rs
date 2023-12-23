@@ -11,8 +11,6 @@ use nix::sys::signalfd::SigSet;
 use nix::sys::termios;
 use nix::sys::termios::InputFlags;
 use nix::sys::time::TimeSpec;
-use nix::unistd::isatty;
-use tokio::fs::File;
 
 #[derive(Debug, Clone)] // TODO: Are clone bounds safe here?
 pub struct ConsoleState<'a>(#[doc(hidden)] BorrowedFd<'a>);
@@ -22,10 +20,8 @@ pub async fn init(fd: Option<RawFd>) -> Result<ConsoleState<'static>> {
     Ok(ConsoleState(unsafe {
         BorrowedFd::borrow_raw(if let Some(fd) = fd {
             fd
-        } else if isatty(libc::STDIN_FILENO)? {
-            std::io::stderr().as_raw_fd()
         } else {
-            File::open("/dev/tty").await?.as_raw_fd()
+            std::io::stderr().as_raw_fd()
         })
     }))
 }
