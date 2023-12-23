@@ -28,7 +28,14 @@ struct Layout {
 }
 
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Container<Message> {
-    pub fn new(children: Vec<Box<dyn Component<Message = Message>>>, style: Option<Style>) -> Self {
+    pub fn new(children: Vec<Box<dyn Component<Message = Message>>>) -> Self {
+        Self::new_with_style(children, None)
+    }
+
+    pub fn new_with_style(
+        children: Vec<Box<dyn Component<Message = Message>>>,
+        style: Option<Style>,
+    ) -> Self {
         let style = style.unwrap_or_default();
 
         Self {
@@ -231,13 +238,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_default_layout() -> Result<()> {
-        let mut root = Container::<()>::new(
-            vec![
-                Box::new(EchoText::<()>::new("test 1")),
-                Box::new(EchoText::<()>::new("test 2")),
-            ],
-            None,
-        );
+        let mut root = Container::<()>::new(vec![
+            Box::new(EchoText::<()>::new("test 1")),
+            Box::new(EchoText::<()>::new("test 2")),
+        ]);
 
         let mut post_office = PostOffice::<()>::new();
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
@@ -256,7 +260,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_vertical_layout() -> Result<()> {
-        let mut root = Container::<()>::new(
+        let mut root = Container::<()>::new_with_style(
             vec![
                 Box::new(EchoText::<()>::new("test 1")),
                 Box::new(EchoText::<()>::new("test 2")),
@@ -286,7 +290,7 @@ mod tests {
     #[should_panic]
     async fn test_vertical_layout_with_expected_horizontal() {
         async fn __do_test() -> Result<()> {
-            let mut root = Container::<()>::new(
+            let mut root = Container::<()>::new_with_style(
                 vec![
                     Box::new(EchoText::<()>::new("test 1")),
                     Box::new(EchoText::<()>::new("test 2")),
@@ -319,7 +323,7 @@ mod tests {
     #[should_panic]
     async fn test_horizontal_layout_with_expected_vertical() {
         async fn __do_test() -> Result<()> {
-            let mut root = Container::<()>::new(
+            let mut root = Container::<()>::new_with_style(
                 vec![
                     Box::new(EchoText::<()>::new("test 1")),
                     Box::new(EchoText::<()>::new("test 2")),
