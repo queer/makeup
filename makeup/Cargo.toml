@@ -13,14 +13,14 @@ keywords = ["cli", "tui", "terminal", "color", "60fps"]
 
 [dependencies]
 async-recursion = "1.0.5"
-async-trait = "0.1.74"
+async-trait = "0.1.75"
 either = "1.9.0"
-eyre = "0.6.8"
+eyre = "0.6.11"
 futures-util = "0.3.29"
 rand = "0.8.5"
-thiserror = "1.0.50"
-tokio = { version = "1.33.0", features = ["full"] }
-libc = "0.2.150"
+thiserror = "1.0.51"
+tokio = { version = "1.35.1", features = ["full"] }
+libc = "0.2.151"
 indoc = "2.0.4"
 strum = { version = "0.25.0", features = ["derive"] }
 taffy = "0.3.18"
