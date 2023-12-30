@@ -90,7 +90,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Container<Message> {
         if let Some(children) = component.children() {
             for child in children {
                 let node = Self::add_one_child(layout, component, child_node)?;
-                Self::recalculate_child_layouts(layout, child, node).await?;
+                Self::recalculate_child_layouts(layout, child.as_ref(), node).await?;
             }
         }
 
@@ -139,7 +139,7 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Container<Message> {
         batch.append(&mut first_batch);
 
         for child in component.children().unwrap_or_default() {
-            let mut next_batch = self.render_recursive(child, ctx).await?;
+            let mut next_batch = self.render_recursive(child.as_ref(), ctx).await?;
             let node = self
                 .layout
                 .taffy_leaves
@@ -162,8 +162,12 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Container<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Container<Message> {
     type Message = Message;
 
-    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
-        Some(self.children.iter().map(|c| c.as_ref()).collect())
+    fn children(&self) -> Option<Vec<&Box<dyn Component<Message = Self::Message>>>> {
+        Some(self.children.iter().collect())
+    }
+
+    fn children_mut(&mut self) -> Option<Vec<&mut Box<dyn Component<Message = Self::Message>>>> {
+        Some(self.children.iter_mut().collect())
     }
 
     async fn update(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
@@ -205,17 +209,6 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Container<Mes
         self.batch(batches)
     }
 
-    async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
-        for child in self.children.iter_mut() {
-            child.update_pass(ctx).await?;
-        }
-        self.update(ctx).await
-    }
-
-    async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
-        Ok(vec![self.render(ctx).await?])
-    }
-
     fn key(&self) -> Key {
         self.key
     }
@@ -251,7 +244,7 @@ mod tests {
             focus: root.key(),
             dimensions: (100, 100),
         };
-        root.update_pass(&mut ctx).await?;
+        root.update(&mut ctx).await?;
 
         assert_renders_one!(static_text!("test 1test 2"), root);
 
@@ -279,7 +272,7 @@ mod tests {
             focus: root.key(),
             dimensions: (100, 100),
         };
-        root.update_pass(&mut ctx).await?;
+        root.update(&mut ctx).await?;
 
         assert_renders_one!(static_text!("test 1\ntest 2"), root);
 
@@ -309,7 +302,7 @@ mod tests {
                 focus: root.key(),
                 dimensions: (100, 100),
             };
-            root.update_pass(&mut ctx).await?;
+            root.update(&mut ctx).await?;
 
             assert_renders_one!(static_text!("test 1test 2"), root);
 
@@ -342,7 +335,7 @@ mod tests {
                 focus: root.key(),
                 dimensions: (100, 100),
             };
-            root.update_pass(&mut ctx).await?;
+            root.update(&mut ctx).await?;
 
             assert_renders_one!(static_text!("test 1\ntest 2"), root);
 

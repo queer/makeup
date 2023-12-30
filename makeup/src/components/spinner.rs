@@ -37,7 +37,11 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Spinner<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spinner<Message> {
     type Message = Message;
 
-    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+    fn children(&self) -> Option<Vec<&Box<dyn Component<Message = Self::Message>>>> {
+        None
+    }
+
+    fn children_mut(&mut self) -> Option<Vec<&mut Box<dyn Component<Message = Self::Message>>>> {
         None
     }
 
@@ -73,14 +77,6 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
             DrawCommand::CharUnderCursor(' '),
             DrawCommand::TextUnderCursor(self.text.clone()),
         ])
-    }
-
-    async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
-        self.update(ctx).await
-    }
-
-    async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
-        Ok(vec![self.render(ctx).await?])
     }
 
     fn key(&self) -> Key {
@@ -129,7 +125,7 @@ mod tests {
             focus: root.key(),
             dimensions: (100, 100),
         };
-        root.update_pass(&mut ctx).await?;
+        root.update(&mut ctx).await?;
 
         assert_renders_many!(
             vec![
@@ -148,7 +144,7 @@ mod tests {
             focus: root.key(),
             dimensions: (100, 100),
         };
-        root.update_pass(&mut ctx).await?;
+        root.update(&mut ctx).await?;
 
         assert_renders_many!(
             vec![
@@ -167,7 +163,7 @@ mod tests {
             focus: root.key(),
             dimensions: (100, 100),
         };
-        root.update_pass(&mut ctx).await?;
+        root.update(&mut ctx).await?;
 
         assert_renders_many!(
             vec![

@@ -10,7 +10,7 @@ async fn main() -> Result<()> {
     let root = EchoText::new("hello, world!");
     let renderer = TerminalRenderer::new();
     let input = TerminalInput::new().await?;
-    let mui = MUI::<()>::new(Box::new(root), Box::new(renderer), input);
+    let mui = MUI::<()>::new(Box::new(root), Box::new(renderer), input)?;
     mui.render_once().await?;
 
     Ok(())

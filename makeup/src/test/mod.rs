@@ -66,7 +66,7 @@ macro_rules! __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_make_test_ui {
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(Box::new($root), Box::new(renderer), input);
+        let ui = MUI::new(Box::new($root), Box::new(renderer), input)?;
         ui
     }};
 
@@ -77,7 +77,7 @@ macro_rules! __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_make_test_ui {
 
         let renderer = MemoryRenderer::new($size, $size);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(&mut $root, Box::new(renderer), input);
+        let ui = MUI::new(&mut $root, Box::new(renderer), input)?;
         ui
     }};
 
@@ -88,7 +88,7 @@ macro_rules! __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_make_test_ui {
 
         let renderer = MemoryRenderer::new($w, $h);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(&mut $root, Box::new(renderer), input);
+        let ui = MUI::new(&mut $root, Box::new(renderer), input)?;
         ui
     }};
 }

@@ -19,7 +19,7 @@ async fn main() -> Result<()> {
     let root = Wave::new(gradient);
     let renderer = TerminalRenderer::new();
     let input = TerminalInput::new().await?;
-    let mui = MUI::new(Box::new(root), Box::new(renderer), input);
+    let mui = MUI::new(Box::new(root), Box::new(renderer), input)?;
     mui.render(false).await?;
 
     Ok(())
@@ -50,7 +50,11 @@ impl Wave {
 impl Component for Wave {
     type Message = ();
 
-    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+    fn children(&self) -> Option<Vec<&Box<dyn Component<Message = Self::Message>>>> {
+        None
+    }
+
+    fn children_mut(&mut self) -> Option<Vec<&mut Box<dyn Component<Message = Self::Message>>>> {
         None
     }
 
@@ -117,14 +121,6 @@ impl Component for Wave {
         commands.push(DrawCommand::ShowCursor);
 
         self.batch(commands)
-    }
-
-    async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
-        self.update(ctx).await
-    }
-
-    async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
-        Ok(vec![self.render(ctx).await?])
     }
 
     fn key(&self) -> Key {

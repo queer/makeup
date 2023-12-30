@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
@@ -28,7 +29,11 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> EchoText<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Message> {
     type Message = Message;
 
-    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+    fn children(&self) -> Option<Vec<&Box<dyn Component<Message = Self::Message>>>> {
+        None
+    }
+
+    fn children_mut(&mut self) -> Option<Vec<&mut Box<dyn Component<Message = Self::Message>>>> {
         None
     }
 
@@ -50,20 +55,18 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
         self.batch(vec![DrawCommand::TextUnderCursor(self.text.clone())])
     }
 
-    async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
-        self.update(ctx).await
-    }
-
-    async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
-        Ok(vec![self.render(ctx).await?])
-    }
-
     fn key(&self) -> Key {
         self.key
     }
 
     fn dimensions(&self) -> Result<Dimensions> {
         Ok((self.text.len() as u64, 1))
+    }
+}
+
+impl Display for EchoText<()> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.text.fmt(f)
     }
 }
 
@@ -80,6 +83,14 @@ mod tests {
         let root = EchoText::<()>::new("henol world");
         assert_renders_one!(static_text!("henol world"), root);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_to_string() -> Result<()> {
+        let root = EchoText::<()>::new("henol world");
+        assert_eq!(root.to_string(), "henol world");
+        assert_eq!(format!("{root}"), "henol world");
         Ok(())
     }
 }

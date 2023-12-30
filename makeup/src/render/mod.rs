@@ -68,7 +68,7 @@ mod tests {
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(Box::new(root), Box::new(renderer), input);
+        let ui = MUI::new(Box::new(root), Box::new(renderer), input)?;
         ui.render_once().await?;
 
         ui.move_cursor(0, 0).await?;

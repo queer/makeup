@@ -1,10 +1,13 @@
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_recursion::async_recursion;
+use derivative::Derivative;
 use either::Either;
 use eyre::Result;
 use makeup_console::Keypress;
+use taffy::prelude::*;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::{Mutex, RwLock};
@@ -57,17 +60,17 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
         root: Box<dyn Component<Message = M>>,
         renderer: Box<dyn Renderer>,
         input: I,
-    ) -> Self {
+    ) -> Result<Self> {
         let (input_tx, input_rx) = tokio::sync::mpsc::unbounded_channel();
 
-        Self {
-            ui: Arc::new(Mutex::new(UI::new(root))),
+        Ok(Self {
+            ui: Arc::new(Mutex::new(UI::new(root)?)),
             renderer: Arc::new(RwLock::new(renderer)),
             input_tx,
             input_rx: Arc::new(Mutex::new(input_rx)),
             input,
             done: Arc::new(Mutex::new(false)),
-        }
+        })
     }
 
     /// Render this MUI in a loop, forever. This will:
@@ -371,29 +374,86 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
     }
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 struct UI<'a, M: std::fmt::Debug + Send + Sync + Clone> {
     root: Box<dyn Component<Message = M>>,
     post_office: RwLocked<PostOffice<M>>,
     focus: Key,
-    components: Vec<Key>,
     exiting: bool,
+    #[derivative(Debug = "ignore")]
+    taffy: Taffy,
+    #[derivative(Debug = "ignore")]
+    taffy_lookup: HashMap<Key, Node>,
     _phantom: std::marker::PhantomData<&'a ()>,
 }
 
 impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
     /// Build a new `UI` from the given root component.
-    pub(self) fn new(root: Box<dyn Component<Message = M>>) -> Self {
+    pub(self) fn new(root: Box<dyn Component<Message = M>>) -> Result<Self> {
         let focus_key = root.key();
-        let components = Self::extract_ordered_keys(root.as_ref());
-        Self {
+        let mut taffy = Taffy::new();
+        let mut taffy_lookup = HashMap::new();
+        Self::build_component_tree(root.as_ref(), &mut taffy, &mut taffy_lookup)?;
+        Ok(Self {
             root,
             post_office: Arc::new(RwLock::new(PostOffice::new())),
             focus: focus_key,
-            components,
             exiting: false,
+            taffy,
+            taffy_lookup,
             _phantom: std::marker::PhantomData,
+        })
+    }
+
+    fn build_component_tree(
+        root: &dyn Component<Message = M>,
+        taffy: &mut Taffy,
+        taffy_lookup: &mut HashMap<Key, Node>,
+    ) -> Result<()> {
+        let (width, height) = root.dimensions()?;
+        let root_node = taffy.new_leaf(Style {
+            size: Size {
+                // TODO: Overflow???
+                width: Dimension::Points(width as f32),
+                height: Dimension::Points(height as f32),
+            },
+            ..Default::default()
+        })?;
+        taffy_lookup.insert(root.key(), root_node);
+
+        if let Some(children) = root.children() {
+            for child in children {
+                Self::build_component_tree_recursive(root_node, child.as_ref(), taffy)?;
+            }
         }
+
+        Ok(())
+    }
+
+    fn build_component_tree_recursive(
+        parent_node: Node,
+        component: &dyn Component<Message = M>,
+        taffy: &mut Taffy,
+    ) -> Result<()> {
+        let (width, height) = component.dimensions()?;
+        let node = taffy.new_leaf(Style {
+            size: Size {
+                // TODO: Overflow???
+                width: Dimension::Points(width as f32),
+                height: Dimension::Points(height as f32),
+            },
+            ..Default::default()
+        })?;
+        taffy.add_child(parent_node, node)?;
+
+        if let Some(children) = component.children() {
+            for child in children {
+                Self::build_component_tree_recursive(node, child.as_ref(), taffy)?;
+            }
+        }
+
+        Ok(())
     }
 
     pub(self) async fn update(
@@ -416,7 +476,9 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         post_office.clear_ui_mailbox();
 
         Self::mail_pending_input(pending_input, &mut post_office, self.focus);
+        let taffy_lookup = &mut self.taffy_lookup;
         Self::update_recursive(
+            taffy_lookup,
             render_dimensions,
             self.root.as_mut(),
             &mut post_office,
@@ -425,6 +487,18 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
         )
         .await?;
 
+        Self::build_component_tree(self.root.as_ref(), &mut self.taffy, &mut self.taffy_lookup)?;
+        self.taffy.compute_layout(
+            *self
+                .taffy_lookup
+                .get(&self.root.key())
+                .expect("root component not found in flex tree!?"),
+            Size {
+                width: AvailableSpace::Definite(render_dimensions.0 as f32),
+                height: AvailableSpace::Definite(render_dimensions.1 as f32),
+            },
+        )?;
+
         Ok(self.exiting)
     }
 
@@ -432,41 +506,28 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
     // TODO: Graceful error handling...
     // TODO: Figure out parallel rendering
     pub(self) async fn render(&mut self, ctx: &mut RenderContext) -> Result<Vec<DrawCommandBatch>> {
-        let render_tree = Self::extract_ordered_keys(self.root.as_ref());
-        let mut added = vec![];
-        let mut removed = vec![];
-
-        for key in render_tree.iter() {
-            if !self.components.contains(key) {
-                added.push(*key);
-            }
-        }
-        for key in self.components.iter() {
-            if !render_tree.contains(key) {
-                removed.push(*key);
-            }
-        }
-
-        self.components.clear();
-        self.components.extend(render_tree);
-
-        // TODO: Figure out not needing to mutate the ctx
         ctx.focus = self.focus;
-        let draw_commands = self.root.render_pass(ctx).await?;
+        let draw_commands = Self::render_recursive(self.root.as_ref(), ctx).await?;
         Ok(draw_commands)
     }
 
-    fn extract_ordered_keys(component: &dyn Component<Message = M>) -> Vec<Key> {
-        let mut out = vec![];
-        out.push(component.key());
+    #[async_recursion]
+    async fn render_recursive(
+        component: &dyn Component<Message = M>,
+        ctx: &RenderContext,
+    ) -> Result<Vec<DrawCommandBatch>> {
+        let mut draw_commands = vec![];
+
+        draw_commands.push(component.render(ctx).await?);
 
         if let Some(children) = component.children() {
             for child in children {
-                out.extend(Self::extract_ordered_keys(child));
+                let mut child_draw_commands = Self::render_recursive(child.as_ref(), ctx).await?;
+                draw_commands.append(&mut child_draw_commands);
             }
         }
 
-        out
+        Ok(draw_commands)
     }
 
     fn mail_pending_input(
@@ -481,6 +542,7 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
 
     #[async_recursion]
     async fn update_recursive(
+        _taffy_lookup: &mut HashMap<Key, Node>,
         render_dimensions: Dimensions,
         component: &mut dyn Component<Message = M>,
         post_office: &mut PostOffice<M>,
@@ -496,7 +558,18 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
             dimensions: render_dimensions,
         };
 
-        (*component).update_pass(&mut pending_update).await?;
+        // TODO: Update subtrees only
+        // let old_keys = Self::get_all_child_keys(component);
+        (*component).update(&mut pending_update).await?;
+        // let new_keys = Self::get_all_child_keys(component);
+        // // TODO: If the old and new component keys don't match, update the taffy tree starting at component.key()'s node
+        // if old_keys != new_keys {
+        //     for key in old_keys {
+        //         // remove from taffy_lookup
+        //         taffy_lookup.remove(&key);
+        //     }
+        //     // TODO: Recursively add all new children to taffy tree
+        // }
 
         let lock_clone = post_office_lock.clone();
         tokio::spawn(async move {
@@ -513,22 +586,47 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone + 'static> UI<'a, M> {
             }
         });
 
+        if let Some(children) = component.children_mut() {
+            for child in children {
+                Self::update_recursive(
+                    _taffy_lookup,
+                    render_dimensions,
+                    child.as_mut(),
+                    post_office,
+                    focus,
+                    post_office_lock.clone(),
+                )
+                .await?;
+            }
+        }
+
         Ok(())
     }
 
     #[allow(unused)]
+    fn get_all_child_keys(component: &dyn Component<Message = M>) -> HashSet<Key> {
+        let mut keys = HashSet::new();
+        keys.insert(component.key());
+
+        if let Some(children) = component.children() {
+            for child in children {
+                keys.extend(Self::get_all_child_keys(child.as_ref()));
+            }
+        }
+
+        keys
+    }
+
     pub(self) async fn send(&self, key: Key, message: M) {
         let mut post_office = self.post_office.write().await;
         post_office.send(key, message);
     }
 
-    #[allow(unused)]
     pub(self) async fn send_makeup(&self, key: Key, message: MakeupMessage) {
         let mut post_office = self.post_office.write().await;
         post_office.send_makeup(key, message);
     }
 
-    #[allow(unused)]
     pub(self) async fn send_control(&self, message: UiControlMessage) {
         let mut post_office = self.post_office.write().await;
         post_office.send_control(message);
@@ -570,8 +668,14 @@ mod tests {
     impl Component for PingableComponent {
         type Message = PingMessage;
 
-        fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
-            Some(self.children.iter().map(|c| c.as_ref()).collect())
+        fn children(&self) -> Option<Vec<&Box<dyn Component<Message = Self::Message>>>> {
+            Some(self.children.iter().collect())
+        }
+
+        fn children_mut(
+            &mut self,
+        ) -> Option<Vec<&mut Box<dyn Component<Message = Self::Message>>>> {
+            None
         }
 
         async fn update(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
@@ -598,20 +702,12 @@ mod tests {
             }
         }
 
-        async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
-            self.update(ctx).await
-        }
-
-        async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
-            Ok(vec![self.render(ctx).await?])
-        }
-
         fn key(&self) -> Key {
             self.key
         }
 
         fn dimensions(&self) -> Result<Dimensions> {
-            unimplemented!()
+            Ok((5, 1))
         }
     }
 
@@ -627,7 +723,7 @@ mod tests {
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(Box::new(root), Box::new(renderer), input);
+        let ui = MUI::new(Box::new(root), Box::new(renderer), input)?;
         ui.update(&[]).await?;
         ui.render_once().await?;
 
@@ -657,7 +753,7 @@ mod tests {
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(Box::new(root), Box::new(renderer), input);
+        let ui = MUI::new(Box::new(root), Box::new(renderer), input)?;
         ui.update(&[]).await?;
 
         assert_eq!(key, ui.focus().await);

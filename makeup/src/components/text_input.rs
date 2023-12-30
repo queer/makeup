@@ -34,7 +34,11 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> TextInput<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Message> {
     type Message = Message;
 
-    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+    fn children(&self) -> Option<Vec<&Box<dyn Component<Message = Self::Message>>>> {
+        None
+    }
+
+    fn children_mut(&mut self) -> Option<Vec<&mut Box<dyn Component<Message = Self::Message>>>> {
         None
     }
 
@@ -84,14 +88,6 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
         }
     }
 
-    async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()> {
-        self.update(ctx).await
-    }
-
-    async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
-        Ok(vec![self.render(ctx).await?])
-    }
-
     fn key(&self) -> Key {
         self.key
     }
@@ -134,7 +130,7 @@ mod tests {
         );
 
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
-        root.update_pass(&mut UpdateContext {
+        root.update(&mut UpdateContext {
             post_office: &mut post_office,
             sender: MessageSender::new(tx.clone(), root.key()),
             focus: root.key(),

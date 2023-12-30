@@ -80,8 +80,8 @@ impl DrawCommandDiff {
 
             let renderer = TerminalRenderer::new();
             let input = TerminalInput::new().await?;
-            let ui = MUI::new(Box::new(data), Box::new(renderer), input);
-            ui
+
+            MUI::new(Box::new(data), Box::new(renderer), input)?
         };
         ui.render_once().await?;
 
@@ -309,8 +309,8 @@ impl VisualDiff {
 
                 let renderer = TerminalRenderer::new();
                 let input = TerminalInput::new().await?;
-                let ui = MUI::new(Box::new(data), Box::new(renderer), input);
-                ui
+
+                MUI::new(Box::new(data), Box::new(renderer), input)?
             };
             ui.render_once().await?;
         }
@@ -330,22 +330,26 @@ mod tests {
 
     use crate::component::{DrawCommandBatch, Key, MakeupUpdate, RenderContext};
     use crate::test::{assert_renders_many, static_text};
-    use crate::ui::RwLocked;
     use crate::{Component, Dimensions, DrawCommand};
 
     #[derive(Debug)]
-    struct LinesComponent<'a> {
+    struct LinesComponent {
         #[allow(dead_code)]
         state: (),
-        children: Vec<RwLocked<&'a mut dyn Component<Message = ()>>>,
         key: Key,
     }
 
     #[async_trait]
-    impl<'a> Component for LinesComponent<'a> {
+    impl Component for LinesComponent {
         type Message = ();
 
-        fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+        fn children(&self) -> Option<Vec<&Box<dyn Component<Message = Self::Message>>>> {
+            None
+        }
+
+        fn children_mut(
+            &mut self,
+        ) -> Option<Vec<&mut Box<dyn Component<Message = Self::Message>>>> {
             None
         }
 
@@ -366,24 +370,6 @@ mod tests {
             ))
         }
 
-        async fn update_pass(&mut self, _ctx: &mut MakeupUpdate<Self>) -> Result<()> {
-            Ok(())
-        }
-
-        async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
-            let mut out = vec![];
-            let render = self.render(ctx).await?;
-            out.push(render);
-
-            for child in &self.children {
-                let child = child.read().await;
-                let mut render = child.render_pass(ctx).await?;
-                out.append(&mut render);
-            }
-
-            Ok(out)
-        }
-
         fn key(&self) -> Key {
             self.key
         }
@@ -399,7 +385,6 @@ mod tests {
         async fn __do_test() -> Result<()> {
             let root = LinesComponent {
                 state: (),
-                children: vec![],
                 key: crate::component::generate_key(),
             };
 

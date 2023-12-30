@@ -27,7 +27,11 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Fps<Message> {
 impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> {
     type Message = Message;
 
-    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
+    fn children(&self) -> Option<Vec<&Box<dyn Component<Message = Self::Message>>>> {
+        None
+    }
+
+    fn children_mut(&mut self) -> Option<Vec<&mut Box<dyn Component<Message = Self::Message>>>> {
         None
     }
 
@@ -49,14 +53,6 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> 
                 ctx.frame_counter
             ))],
         )
-    }
-
-    async fn update_pass(&mut self, _ctx: &mut MakeupUpdate<Self>) -> Result<()> {
-        Ok(())
-    }
-
-    async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
-        Ok(vec![self.render(ctx).await?])
     }
 
     fn key(&self) -> Key {

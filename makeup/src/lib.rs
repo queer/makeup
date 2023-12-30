@@ -93,8 +93,14 @@ mod tests {
     impl Component for BasicComponent {
         type Message = ();
 
-        fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>> {
-            None
+        fn children(&self) -> Option<Vec<&Box<dyn Component<Message = Self::Message>>>> {
+            Some(self.children.iter().collect())
+        }
+
+        fn children_mut(
+            &mut self,
+        ) -> Option<Vec<&mut Box<dyn Component<Message = Self::Message>>>> {
+            Some(self.children.iter_mut().collect())
         }
 
         async fn update(&mut self, _ctx: &mut MakeupUpdate<Self>) -> Result<()> {
@@ -108,29 +114,12 @@ mod tests {
             ))
         }
 
-        async fn update_pass(&mut self, _ctx: &mut MakeupUpdate<Self>) -> Result<()> {
-            Ok(())
-        }
-
-        async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>> {
-            let mut out = vec![];
-            let render = self.render(ctx).await?;
-            out.push(render);
-
-            for child in &self.children {
-                let mut render = child.render_pass(ctx).await?;
-                out.append(&mut render);
-            }
-
-            Ok(out)
-        }
-
         fn key(&self) -> Key {
             self.key
         }
 
         fn dimensions(&self) -> Result<Dimensions> {
-            unimplemented!()
+            Ok((26, 1))
         }
     }
 
@@ -144,7 +133,7 @@ mod tests {
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(Box::new(root), Box::new(renderer), input);
+        let ui = MUI::new(Box::new(root), Box::new(renderer), input)?;
         ui.render_once().await?;
         let expected = "henol world".to_string();
         ui.render_once().await?;
@@ -166,7 +155,7 @@ mod tests {
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(Box::new(root), Box::new(renderer), input);
+        let ui = MUI::new(Box::new(root), Box::new(renderer), input)?;
         ui.render_once().await?;
 
         let expected = "henol world? wrong! banana".to_string();

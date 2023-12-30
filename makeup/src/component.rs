@@ -29,7 +29,7 @@ pub type ComponentMessage<C> = RawComponentMessage<ExtractMessageFromComponent<C
 pub type Mailbox<C> = Vec<ComponentMessage<C>>;
 
 /// An [`UnboundedSender`] that can be used to send messages to a component
-/// during the [`Component::update_pass`] loop.
+/// during updates.
 pub type ContextTx<M> = UnboundedSender<(Key, RawComponentMessage<M>)>;
 
 pub type MakeupUpdate<'a, C> = UpdateContext<'a, ExtractMessageFromComponent<C>>;
@@ -192,7 +192,13 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     type Message: std::fmt::Debug + Send + Sync + Clone;
 
     /// The children this component has. May be empty when present.
-    fn children(&self) -> Option<Vec<&dyn Component<Message = Self::Message>>>;
+    ///
+    /// **NOTE:** This *intentionally* returns a borrowed box!
+    #[allow(clippy::borrowed_box)]
+    fn children(&self) -> Option<Vec<&Box<dyn Component<Message = Self::Message>>>>;
+
+    /// The children this component has, but mutable. May be empty when present.
+    fn children_mut(&mut self) -> Option<Vec<&mut Box<dyn Component<Message = Self::Message>>>>;
 
     /// Process any messages that have been sent to this component. Messages
     /// are expected to be process asynchronously, ie. any long-running
@@ -201,15 +207,6 @@ pub trait Component: std::fmt::Debug + Send + Sync {
 
     /// Render this component.
     async fn render(&self, ctx: &RenderContext) -> Result<DrawCommandBatch>;
-
-    /// An update pass for this component. Generally, this is implemented by
-    /// calling [`Self::update`] and calling `::update` on any child
-    /// components.
-    async fn update_pass(&mut self, ctx: &mut MakeupUpdate<Self>) -> Result<()>;
-
-    /// A render pass for this component. Generally, this is implemented by
-    /// invoking `self.render()` and then calling `render` on each child.
-    async fn render_pass(&self, ctx: &RenderContext) -> Result<Vec<DrawCommandBatch>>;
 
     /// A unique key for this component. See [`generate_key`].
     fn key(&self) -> Key;
