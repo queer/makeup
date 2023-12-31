@@ -246,7 +246,7 @@ dependencies = [
 
 [[package]]
 name = "makeup"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -269,14 +269,14 @@ dependencies = [
 
 [[package]]
 name = "makeup-ansi"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "eyre",
 ]
 
 [[package]]
 name = "makeup-console"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "async-recursion",
  "eyre",
@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "makeup-macros"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "proc-macro2",
  "quote",
