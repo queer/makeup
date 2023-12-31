@@ -18,4 +18,4 @@ thiserror = "1.0.51"
 
 [dependencies.makeup-ansi]
 path = "../makeup-ansi"
-version = "0.0.2"
+version = "0.0.3"
