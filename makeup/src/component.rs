@@ -184,8 +184,11 @@ pub enum MakeupMessage {
     Keypress(Keypress),
 }
 
-/// A component in a makeup UI. Stateless components can be implemented via
-/// `Self::State = ()`.
+/// A component in a makeup UI.
+///
+/// Component layout is done via flexbox. This means that container-like
+/// components CANNOT render text directly on themselves, but must instead have
+/// child components for all rendering.
 #[async_trait]
 pub trait Component: std::fmt::Debug + Send + Sync {
     /// The type of messages that can be sent to this component.
