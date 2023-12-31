@@ -1,6 +1,6 @@
 [package]
 name = "makeup-macros"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 description = "Macro helper library for makeup"
 repository = "https://github.com/queer/makeup"
