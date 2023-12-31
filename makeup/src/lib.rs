@@ -46,34 +46,75 @@ pub enum DrawCommand {
     /// cursor and the [`LineEraseMode`] passed in.
     EraseCurrentLine(LineEraseMode),
 
-    /// Draw text at the given (x, y), moving the cursor to
-    /// `(x + text.len(), y)`.
-    TextAt {
-        x: Coordinate,
-        y: Coordinate,
-        text: String,
-    },
+    /// Move the cursor absolutely. This is almost certainly ***NOT*** what you
+    /// want.
+    MoveCursorAbsolute { x: Coordinate, y: Coordinate },
 
-    /// Move the cursor relative to its current position.
+    /// Move the cursor relative to its current position. You probably want
+    /// this and not `MoveCursorAbsolute`.
     MoveCursorRelative {
         x: RelativeCoordinate,
         y: RelativeCoordinate,
     },
-
-    /// Move the cursor absolutely.
-    MoveCursorAbsolute { x: Coordinate, y: Coordinate },
 
     /// Hide the cursor.
     HideCursor,
 
     /// Show the cursor.
     ShowCursor,
+
+    /// Style the text that follows this command.
+    Style(DrawStyle),
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, strum::Display)]
+pub enum DrawStyle {
+    /// Draw the text with the given foreground and background colours.
+    Coloured {
+        foreground: Option<u32>,
+        background: Option<u32>,
+    },
+
+    /// Draw the text with the given foreground colour, and the default
+    /// background colour.
+    Foreground(u32),
+
+    /// Draw the text with the given background colour, and the default
+    /// foreground colour.
+    Background(u32),
+
+    /// Draw the text with the given foreground and background colours, using
+    /// the 8-bit colour palette.
+    Coloured8Bit {
+        foreground: Option<Colour>,
+        background: Option<Colour>,
+    },
+
+    /// Draw the text with the given foreground colour, and the default
+    /// background colour, using the 8-bit colour palette.
+    Foreground8Bit(Colour),
+
+    /// Draw the text with the given background colour, and the default
+    /// foreground colour, using the 8-bit colour palette.
+    Background8Bit(Colour),
+
+    /// Draw the text with the default foreground and background colours.
+    /// This will undo any previous text settings.
+    Default,
+
+    /// Draw the text in bold font.
+    Bold,
+
+    /// Draw the text in italic font.
+    Italic,
+
+    /// Draw the text with an underline.
+    Underline,
 }
 
 #[cfg(test)]
 mod tests {
     use crate::component::{DrawCommandBatch, Key, MakeupUpdate, RenderContext};
-    use crate::components::EchoText;
     use crate::input::TerminalInput;
     use crate::render::MemoryRenderer;
     use crate::{Component, Dimensions, DrawCommand, MUI};
@@ -118,14 +159,14 @@ mod tests {
             self.key
         }
 
-        fn dimensions(&self) -> Result<Dimensions> {
-            Ok((26, 1))
+        fn dimensions(&self) -> Result<Option<Dimensions>> {
+            Ok(Some((11, 1)))
         }
     }
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
-        let root = BasicComponent {
+        let mut root = BasicComponent {
             state: (),
             children: vec![],
             key: crate::component::generate_key(),
@@ -133,32 +174,10 @@ mod tests {
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(Box::new(root), Box::new(renderer), input)?;
+        let ui = MUI::new(&mut root, Box::new(renderer), input)?;
         ui.render_once().await?;
         let expected = "henol world".to_string();
         ui.render_once().await?;
-        ui.move_cursor(0, 0).await?;
-        assert_eq!(expected, ui.read_at_cursor(expected.len() as u64).await?);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_it_renders_children() -> Result<()> {
-        let child = EchoText::new("? wrong! banana!");
-
-        let root = BasicComponent {
-            state: (),
-            children: vec![Box::new(child)],
-            key: crate::component::generate_key(),
-        };
-
-        let renderer = MemoryRenderer::new(128, 128);
-        let input = TerminalInput::new().await?;
-        let ui = MUI::new(Box::new(root), Box::new(renderer), input)?;
-        ui.render_once().await?;
-
-        let expected = "henol world? wrong! banana".to_string();
         ui.move_cursor(0, 0).await?;
         assert_eq!(expected, ui.read_at_cursor(expected.len() as u64).await?);
 

@@ -2,10 +2,10 @@ use std::io::Write;
 
 use async_trait::async_trait;
 use eyre::Result;
-use makeup_ansi::{CursorVisibility, DisplayEraseMode};
+use makeup_ansi::{CursorVisibility, DisplayEraseMode, SgrParameter};
 
 use crate::component::DrawCommandBatch;
-use crate::{Ansi, DrawCommand};
+use crate::{Ansi, DrawCommand, DrawStyle};
 use crate::{Coordinate, Coordinates, Dimension, RelativeCoordinate};
 
 use super::{MemoryRenderer, Renderer};
@@ -70,11 +70,6 @@ impl Renderer for TerminalRenderer {
                         buffer += &Ansi::EraseInLine(mode.clone()).to_string();
                     }
 
-                    DrawCommand::TextAt { x, y, text } => {
-                        buffer += &Ansi::CursorPosition(*x, *y).to_string();
-                        buffer += text;
-                    }
-
                     DrawCommand::MoveCursorRelative { x, y } => {
                         match x.cmp(&0) {
                             std::cmp::Ordering::Less => {
@@ -108,6 +103,74 @@ impl Renderer for TerminalRenderer {
                     DrawCommand::ShowCursor => {
                         buffer += &Ansi::CursorVisibility(CursorVisibility::Visible).to_string();
                     }
+
+                    DrawCommand::Style(style) => match style {
+                        DrawStyle::Coloured {
+                            foreground,
+                            background,
+                        } => {
+                            if let Some(background) = background {
+                                buffer += &Ansi::Sgr(vec![SgrParameter::HexBackgroundColour(
+                                    *background,
+                                )])
+                                .to_string();
+                            }
+                            if let Some(foreground) = foreground {
+                                buffer += &Ansi::Sgr(vec![SgrParameter::HexForegroundColour(
+                                    *foreground,
+                                )])
+                                .to_string();
+                            }
+                        }
+
+                        DrawStyle::Foreground(foreground) => {
+                            buffer +=
+                                &Ansi::Sgr(vec![SgrParameter::HexForegroundColour(*foreground)])
+                                    .to_string();
+                        }
+
+                        DrawStyle::Background(background) => {
+                            buffer +=
+                                &Ansi::Sgr(vec![SgrParameter::HexBackgroundColour(*background)])
+                                    .to_string();
+                        }
+
+                        DrawStyle::Coloured8Bit {
+                            foreground,
+                            background,
+                        } => {
+                            if let Some(background) = background {
+                                buffer += &Ansi::TerminalBackgroundColour(*background).to_string();
+                            }
+                            if let Some(foreground) = foreground {
+                                buffer += &Ansi::TerminalForegroundColour(*foreground).to_string();
+                            }
+                        }
+
+                        DrawStyle::Foreground8Bit(foreground) => {
+                            buffer += &Ansi::TerminalForegroundColour(*foreground).to_string();
+                        }
+
+                        DrawStyle::Background8Bit(background) => {
+                            buffer += &Ansi::TerminalBackgroundColour(*background).to_string();
+                        }
+
+                        DrawStyle::Default => {
+                            buffer += &Ansi::Sgr(vec![SgrParameter::Reset]).to_string();
+                        }
+
+                        DrawStyle::Bold => {
+                            buffer += &Ansi::Sgr(vec![SgrParameter::Bold]).to_string();
+                        }
+
+                        DrawStyle::Italic => {
+                            buffer += &Ansi::Sgr(vec![SgrParameter::Italic]).to_string();
+                        }
+
+                        DrawStyle::Underline => {
+                            buffer += &Ansi::Sgr(vec![SgrParameter::Underline]).to_string();
+                        }
+                    },
                 }
             }
         }

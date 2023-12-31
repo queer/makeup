@@ -219,7 +219,11 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     /// The dimensions of this component. Coordinates are calculated
     /// automatically by the parent component that manages layout, or are
     /// implied by render order.
-    fn dimensions(&self) -> Result<Dimensions>;
+    fn dimensions(&self) -> Result<Option<Dimensions>>;
+
+    fn style(&self) -> Option<taffy::style::Style> {
+        None
+    }
 }
 
 /// Generate a most-likely-unique key for a component.

@@ -71,7 +71,7 @@ impl DrawCommandDiff {
             ));
         }
 
-        let data = EchoText::<()>::new(data);
+        let mut data = EchoText::<()>::new(data);
 
         let ui = {
             use crate::input::TerminalInput;
@@ -81,7 +81,7 @@ impl DrawCommandDiff {
             let renderer = TerminalRenderer::new();
             let input = TerminalInput::new().await?;
 
-            MUI::new(Box::new(data), Box::new(renderer), input)?
+            MUI::new(&mut data, Box::new(renderer), input)?
         };
         ui.render_once().await?;
 
@@ -300,7 +300,7 @@ impl VisualDiff {
 
     pub async fn render(&self) -> Result<()> {
         if self.is_different {
-            let data = EchoText::<()>::new(&self.rendered_diff);
+            let mut data = EchoText::<()>::new(&self.rendered_diff);
 
             let ui = {
                 use crate::input::TerminalInput;
@@ -310,7 +310,7 @@ impl VisualDiff {
                 let renderer = TerminalRenderer::new();
                 let input = TerminalInput::new().await?;
 
-                MUI::new(Box::new(data), Box::new(renderer), input)?
+                MUI::new(&mut data, Box::new(renderer), input)?
             };
             ui.render_once().await?;
         }
@@ -374,7 +374,7 @@ mod tests {
             self.key
         }
 
-        fn dimensions(&self) -> Result<Dimensions> {
+        fn dimensions(&self) -> Result<Option<Dimensions>> {
             unimplemented!()
         }
     }
@@ -383,7 +383,7 @@ mod tests {
     #[should_panic]
     async fn test_diff_works() {
         async fn __do_test() -> Result<()> {
-            let root = LinesComponent {
+            let mut root = LinesComponent {
                 state: (),
                 key: crate::component::generate_key(),
             };

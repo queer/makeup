@@ -6,7 +6,7 @@ use makeup_ansi::LineEraseMode;
 use makeup_console::Keypress;
 
 use crate::component::{DrawCommandBatch, Key, MakeupMessage, MakeupUpdate, RenderContext};
-use crate::{check_mail, Component, DrawCommand};
+use crate::{check_mail, Component, Dimensions, DrawCommand};
 
 /// A simple component that renders text under the cursor.
 #[derive(Debug)]
@@ -92,9 +92,12 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
         self.key
     }
 
-    fn dimensions(&self) -> Result<(u64, u64)> {
+    fn dimensions(&self) -> Result<Option<Dimensions>> {
         // +2 comes from the `: ` between the prompt and the buffer.
-        Ok((self.prompt.len() as u64 + 2 + self.buffer.len() as u64, 1))
+        Ok(Some((
+            self.prompt.len() as u64 + 2 + self.buffer.len() as u64,
+            1,
+        )))
     }
 }
 
@@ -121,7 +124,7 @@ mod tests {
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("".into())
             ],
-            &root
+            root
         );
 
         post_office.send_makeup(
@@ -145,7 +148,7 @@ mod tests {
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("a".into())
             ],
-            &root
+            root
         );
 
         Ok(())

@@ -73,7 +73,7 @@ impl Renderer for MemoryRenderer {
             for command in commands {
                 match command {
                     DrawCommand::TextUnderCursor(text) => {
-                        for (_i, c) in text.chars().enumerate() {
+                        for c in text.chars() {
                             self.insert_char(c)?;
                         }
                     }
@@ -100,17 +100,6 @@ impl Renderer for MemoryRenderer {
                         }
                     },
 
-                    DrawCommand::TextAt { x, y, text } => {
-                        let text_len = text.len() as Dimension;
-                        self.bounds_check(*x, *y)?;
-                        self.bounds_check(*x + text_len, *y)?;
-                        for (i, c) in text.chars().enumerate() {
-                            self.text.insert((x + (i as Dimension), *y), c);
-                        }
-                        self.cursor_x = x + text_len;
-                        self.cursor_y = *y;
-                    }
-
                     DrawCommand::MoveCursorRelative { x, y } => {
                         let cursor_x = self.cursor_x as RelativeCoordinate;
                         let cursor_y = self.cursor_y as RelativeCoordinate;
@@ -120,15 +109,18 @@ impl Renderer for MemoryRenderer {
                         self.cursor_y = (cursor_y + y) as Coordinate;
                     }
 
+                    DrawCommand::HideCursor => {}
+
+                    DrawCommand::ShowCursor => {}
+
+                    // TODO: We actually do need to implement this tho...
+                    DrawCommand::Style(_) => {}
+
                     DrawCommand::MoveCursorAbsolute { x, y } => {
                         self.bounds_check(*x, *y)?;
                         self.cursor_x = *x;
                         self.cursor_y = *y;
                     }
-
-                    DrawCommand::HideCursor => {}
-
-                    DrawCommand::ShowCursor => {}
                 }
             }
         }

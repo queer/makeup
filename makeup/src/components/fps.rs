@@ -59,8 +59,9 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> 
         self.key
     }
 
-    fn dimensions(&self) -> Result<Dimensions> {
-        Ok((0, 0))
+    fn dimensions(&self) -> Result<Option<Dimensions>> {
+        // TODO: This should be the dimensions of the text, but we don't have that yet.
+        Ok(Some((0, 0)))
     }
 }
 
@@ -68,13 +69,12 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for Fps<Message> 
 mod tests {
     use super::Fps;
     use crate::test::{assert_renders_one, static_text};
-    use crate::Component;
 
     use eyre::Result;
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
-        let root = Fps::<()>::new();
+        let mut root = Fps::<()>::new();
         assert_renders_one!(
             static_text!("FPS: 0.00 (effective:       0.00), dimensions: (0, 0), cursor (when this render started): (0, 0), last frame: 0ms, frame: 0"),
             root

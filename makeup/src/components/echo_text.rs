@@ -59,8 +59,9 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for EchoText<Mess
         self.key
     }
 
-    fn dimensions(&self) -> Result<Dimensions> {
-        Ok((self.text.len() as u64, 1))
+    fn dimensions(&self) -> Result<Option<Dimensions>> {
+        // TODO: Newlines?
+        Ok(Some((self.text.len() as u64, 1)))
     }
 }
 
@@ -74,13 +75,12 @@ impl Display for EchoText<()> {
 mod tests {
     use super::EchoText;
     use crate::test::{assert_renders_one, static_text};
-    use crate::Component;
 
     use eyre::Result;
 
     #[tokio::test]
     async fn test_it_works() -> Result<()> {
-        let root = EchoText::<()>::new("henol world");
+        let mut root = EchoText::<()>::new("henol world");
         assert_renders_one!(static_text!("henol world"), root);
 
         Ok(())

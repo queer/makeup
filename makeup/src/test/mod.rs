@@ -17,8 +17,14 @@ macro_rules! __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_assert_renders_many {
     // (expected, component)
     // create a fake context and apply it to the component
     ($expected:expr, $component:expr) => {{
-        let ctx = $crate::test::fake_render_ctx();
-        let (_key, actual) = $component.render(&ctx).await?;
+        let mut ctx = $crate::test::fake_render_ctx();
+        let ui = $crate::test::make_test_ui!(&mut $component);
+        let actual = ui
+            .render_commands(&mut ctx)
+            .await?
+            .iter()
+            .flat_map(|(_key, cmds)| cmds.clone())
+            .collect();
 
         let diff = $crate::test::diff::DrawCommandDiff::new($expected, actual);
         let diff: $crate::test::diff::VisualDiff = diff.into_visual_diff().await?;
@@ -66,7 +72,7 @@ macro_rules! __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_make_test_ui {
 
         let renderer = MemoryRenderer::new(128, 128);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(Box::new($root), Box::new(renderer), input)?;
+        let ui = MUI::new($root, Box::new(renderer), input)?;
         ui
     }};
 
@@ -77,7 +83,7 @@ macro_rules! __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_make_test_ui {
 
         let renderer = MemoryRenderer::new($size, $size);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(&mut $root, Box::new(renderer), input)?;
+        let ui = MUI::new($root, Box::new(renderer), input)?;
         ui
     }};
 
@@ -88,7 +94,7 @@ macro_rules! __THIS_IS_NOT_PUBLIC_DO_NOT_CALL_make_test_ui {
 
         let renderer = MemoryRenderer::new($w, $h);
         let input = TerminalInput::new().await?;
-        let ui = MUI::new(&mut $root, Box::new(renderer), input)?;
+        let ui = MUI::new($root, Box::new(renderer), input)?;
         ui
     }};
 }

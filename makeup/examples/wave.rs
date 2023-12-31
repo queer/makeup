@@ -5,7 +5,9 @@ use colorgrad::Gradient;
 use makeup::component::{DrawCommandBatch, Key, MakeupMessage, MakeupUpdate, RenderContext};
 use makeup::input::TerminalInput;
 use makeup::render::terminal::TerminalRenderer;
-use makeup::{check_mail, Ansi, Component, DrawCommand, LineEraseMode, SgrParameter, MUI};
+use makeup::{
+    check_mail, Ansi, Component, Dimensions, DrawCommand, LineEraseMode, SgrParameter, MUI,
+};
 
 use eyre::Result;
 
@@ -16,10 +18,10 @@ async fn main() -> Result<()> {
             "#FFB3BA", "#FFDFBA", "#FFFFBA", "#BAFFC9", "#BAE1FF", "#D0BAFF", "#FFBAF2", "#FFB3BA",
         ])
         .build()?;
-    let root = Wave::new(gradient);
+    let mut root = Wave::new(gradient);
     let renderer = TerminalRenderer::new();
     let input = TerminalInput::new().await?;
-    let mui = MUI::new(Box::new(root), Box::new(renderer), input)?;
+    let mui = MUI::new(&mut root, Box::new(renderer), input)?;
     mui.render(false).await?;
 
     Ok(())
@@ -92,24 +94,23 @@ impl Component for Wave {
         let len = &colours.len();
         colours.rotate_right(self.step as usize * (len / 10));
 
-        for (i, colour) in colours.iter().enumerate() {
+        let mut output = String::new();
+        for colour in colours.iter() {
             let [r, g, b, _] = colour.to_rgba8();
             let r = r as u32;
             let g = g as u32;
             let b = b as u32;
-            commands.push(DrawCommand::TextAt {
-                x: 0,
-                y: i as u64,
-                text: format!(
-                    "{}{}\n",
-                    Ansi::Sgr(vec![SgrParameter::HexForegroundColour(
-                        r << 16 | g << 8 | b
-                    )]),
-                    "█".repeat(ctx.dimensions.0 as usize)
-                ),
-            });
+            output += format!(
+                "{}{}\n",
+                Ansi::Sgr(vec![SgrParameter::HexForegroundColour(
+                    r << 16 | g << 8 | b
+                )]),
+                "█".repeat(ctx.dimensions.0 as usize)
+            )
+            .as_str();
         }
 
+        commands.push(DrawCommand::TextUnderCursor(output));
         commands.push(DrawCommand::EraseCurrentLine(
             LineEraseMode::FromCursorToEnd,
         ));
@@ -127,7 +128,7 @@ impl Component for Wave {
         self.key
     }
 
-    fn dimensions(&self) -> Result<(u64, u64)> {
-        Ok((0, 0))
+    fn dimensions(&self) -> Result<Option<Dimensions>> {
+        Ok(None)
     }
 }

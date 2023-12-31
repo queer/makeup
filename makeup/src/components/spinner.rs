@@ -83,9 +83,9 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone + 'static> Component for Spi
         self.key
     }
 
-    fn dimensions(&self) -> Result<Dimensions> {
+    fn dimensions(&self) -> Result<Option<Dimensions>> {
         // +2 comes from the space and spinner character
-        Ok((self.text.len() as u64 + 2, 1))
+        Ok(Some((self.text.len() as u64 + 2, 1)))
     }
 }
 
@@ -114,7 +114,7 @@ mod tests {
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ],
-            &root
+            root
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
@@ -133,7 +133,7 @@ mod tests {
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ],
-            &root
+            root
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
@@ -152,7 +152,7 @@ mod tests {
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ],
-            &root
+            root
         );
 
         post_office.send_makeup(root.key(), MakeupMessage::TimerTick(interval));
@@ -171,7 +171,7 @@ mod tests {
                 DrawCommand::CharUnderCursor(' '),
                 DrawCommand::TextUnderCursor("henol world".into(),)
             ],
-            &root
+            root
         );
 
         Ok(())
