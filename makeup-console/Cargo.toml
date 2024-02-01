@@ -10,7 +10,7 @@ keywords = ["console"]
 
 [dependencies]
 tokio = { version = "1.35.1", features = ["full"] }
-eyre = "0.6.11"
+eyre = "0.6.12"
 nix = { version = "0.27.1", features = ["poll", "signal", "term", "fs"] }
 libc = "0.2.152"
 async-recursion = "1.0.5"
