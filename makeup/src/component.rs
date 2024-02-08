@@ -227,6 +227,12 @@ pub trait Component: std::fmt::Debug + Send + Sync {
     fn style(&self) -> Option<taffy::style::Style> {
         None
     }
+
+    /// Whether or not this component accepts focus. This is intended to help
+    /// differentiate between ex. text inputs and labels.
+    fn accepts_focus(&self) -> bool {
+        false
+    }
 }
 
 /// Generate a most-likely-unique key for a component.

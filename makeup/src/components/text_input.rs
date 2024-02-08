@@ -99,6 +99,10 @@ impl<Message: std::fmt::Debug + Send + Sync + Clone> Component for TextInput<Mes
             1,
         )))
     }
+
+    fn accepts_focus(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
