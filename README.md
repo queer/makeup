@@ -2,7 +2,7 @@
 
 Pretty CLI / TUI interfaces.
 
-MSRV 1.67.
+MSRV 1.70.
 
 
 ## READ ME FIRST
