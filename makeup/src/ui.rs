@@ -36,6 +36,9 @@ pub enum RenderState {
 
 pub type RwLocked<T> = Arc<RwLock<T>>;
 
+pub const FPS_TARGET: u64 = 60;
+pub const ONE_SECOND_IN_MICROS: u128 = Duration::from_secs(1).as_micros();
+
 /// A makeup UI. Generally used with [`crate::render::TerminalRenderer`].
 ///
 /// MUIs are supposed to be entirely async. Components are updated and rendered
@@ -136,6 +139,8 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
             })
         };
 
+        let frame_target = Duration::from_micros((ONE_SECOND_IN_MICROS as u64) / FPS_TARGET);
+
         'run_loop: loop {
             tokio::select! {
                 update_res = self.update_loop() => {
@@ -155,9 +160,22 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
                     &dimensions,
                 ) => {
                     let currently_exiting = match render_res {
-                        Ok(exiting) => exiting,
-                        Err(_e) => true,
+                        Ok((false, elapsed)) => {
+                            if let Some(duration) = frame_target.checked_sub(elapsed) {
+                                tokio::time::sleep(duration).await;
+                            } else {
+                                // log::warn!("Frame took too long to render: {:?}", elapsed);
+                            }
+                            false
+                        }
+                        Ok((true, _)) => {
+                            true
+                        }
+                        Err(_) => {
+                            true
+                        }
                     };
+
                     if currently_exiting {
                         {
                             let mut done = self.done.lock().await;
@@ -232,12 +250,8 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
         effective_fps: &mut f64,
         cursor: &Coordinates,
         dimensions: &Dimensions,
-    ) -> Result<bool> {
+    ) -> Result<(bool, Duration)> {
         let start = Instant::now();
-        let fps_target = 60;
-        let one_second_in_micros = Duration::from_secs(1).as_micros();
-        let frame_target = Duration::from_micros((one_second_in_micros as u64) / fps_target);
-
         let mut render_context = RenderContext {
             last_frame_time: *last_frame_time,
             frame_counter: *frame_counter,
@@ -260,24 +274,17 @@ impl<'a, M: std::fmt::Debug + Send + Sync + Clone, I: Input + 'static> MUI<'a, M
 
         self.flush_renderer().await?;
 
-        *frame_counter += 1;
-
         let elapsed = start.elapsed();
         *last_frame_time = Some(elapsed);
-        *effective_fps = (one_second_in_micros as f64) / (elapsed.as_micros() as f64);
-        *last_fps = if *effective_fps as u64 > fps_target {
-            fps_target as f64
+        *effective_fps = (ONE_SECOND_IN_MICROS as f64) / (elapsed.as_micros() as f64);
+        *frame_counter += 1;
+        *last_fps = if *effective_fps as u64 > FPS_TARGET {
+            FPS_TARGET as f64
         } else {
             *effective_fps
         };
 
-        if let Some(duration) = frame_target.checked_sub(elapsed) {
-            tokio::time::sleep(duration).await
-        } else {
-            // log::warn!("Frame took too long to render: {:?}", elapsed);
-        }
-
-        Ok(currently_exiting)
+        Ok((currently_exiting, elapsed))
     }
 
     pub async fn update(&'a self, pending_input: &[Keypress]) -> Result<()> {

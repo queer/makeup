@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
             _ = tokio::time::sleep(Duration::from_secs(1)) => {
                 stop_mui.send_control(UiControlMessage::StopRendering).await;
             }
-            res = mui.render(false) => {
+            res = mui.render(true) => {
                 match res {
                     Ok(RenderState::Stopped) => {
                         break 'outer;
