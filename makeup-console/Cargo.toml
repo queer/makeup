@@ -14,7 +14,7 @@ eyre = "0.6.12"
 nix = { version = "0.27.1", features = ["poll", "signal", "term", "fs"] }
 libc = "0.2.153"
 async-recursion = "1.0.5"
-thiserror = "1.0.56"
+thiserror = "1.0.57"
 
 [dependencies.makeup-ansi]
 path = "../makeup-ansi"
