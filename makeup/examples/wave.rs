@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-const DURATION: Duration = Duration::from_millis(32);
+const DURATION: Duration = Duration::from_millis(16);
 
 #[derive(Debug)]
 struct Wave {
@@ -72,7 +72,7 @@ impl Component for Wave {
             ctx,
             match _ {
                 MakeupMessage::TimerTick(_) => {
-                    self.step = (self.step + 1) % 10;
+                    self.step += 1;
                     ctx.sender.send_makeup_message_after(
                         self.key(),
                         MakeupMessage::TimerTick(DURATION),
@@ -91,8 +91,8 @@ impl Component for Wave {
         commands.push(DrawCommand::HideCursor);
 
         let mut colours = self.gradient.colors(ctx.dimensions.1 as usize - 1);
-        let len = &colours.len();
-        colours.rotate_right(self.step as usize * (len / 10));
+        let step = self.step % colours.len() as u64;
+        colours.rotate_right(step as usize);
 
         let mut output = String::new();
         for colour in colours.iter() {
@@ -115,8 +115,8 @@ impl Component for Wave {
             LineEraseMode::FromCursorToEnd,
         ));
         commands.push(DrawCommand::TextUnderCursor(format!(
-            "{:.2}fps ({:.2}fps effective), dimensions {:?}",
-            ctx.fps, ctx.effective_fps, ctx.dimensions
+            "{:.2}fps ({:.2}fps effective), dimensions {:?}, step {:?} frame {:?}",
+            ctx.fps, ctx.effective_fps, ctx.dimensions, self.step, ctx.frame_counter,
         )));
 
         commands.push(DrawCommand::ShowCursor);
