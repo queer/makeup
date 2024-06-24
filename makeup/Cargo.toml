@@ -22,7 +22,7 @@ thiserror = "1.0.59"
 tokio = { version = "1.36.0", features = ["full", "tracing"] }
 libc = "0.2.154"
 indoc = "2.0.4"
-strum = { version = "0.26.1", features = ["derive"] }
+strum = { version = "0.26.3", features = ["derive"] }
 taffy = "0.3.18"
 derivative = "2.2.0"
 
