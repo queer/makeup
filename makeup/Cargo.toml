@@ -27,7 +27,7 @@ taffy = "0.3.18"
 derivative = "2.2.0"
 
 [dev-dependencies]
-colorgrad = "0.6.2"
+colorgrad = "0.7.0"
 
 [dependencies.makeup-ansi]
 path = "../makeup-ansi"
