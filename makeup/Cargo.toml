@@ -20,7 +20,7 @@ futures-util = "0.3.30"
 rand = "0.8.5"
 thiserror = "1.0.63"
 tokio = { version = "1.39.1", features = ["full", "tracing"] }
-libc = "0.2.155"
+libc = "0.2.158"
 indoc = "2.0.4"
 strum = { version = "0.26.1", features = ["derive"] }
 taffy = "0.3.18"
