@@ -12,7 +12,7 @@ keywords = ["console"]
 tokio = { version = "1.39.1", features = ["full"] }
 eyre = "0.6.12"
 nix = { version = "0.27.1", features = ["poll", "signal", "term", "fs"] }
-libc = "0.2.155"
+libc = "0.2.159"
 async-recursion = "1.0.5"
 thiserror = "1.0.63"
 
